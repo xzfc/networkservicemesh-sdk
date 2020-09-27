@@ -16,6 +16,7 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
+          export  GOFLAGS="-count=10"
           ${GOPATH}/bin/gotestsum --junitfile ~/junit/unit-tests.xml -- -race -short github.com/networkservicemesh/sdk/pkg/networkservice/common/heal
   test-win:
     name: test-win
@@ -31,6 +32,7 @@ jobs:
         run: |
           $env:Path += ";$(go env GOPATH)\bin"
           mkdir $home/junit
+          SET GOFLAGS="-count=10"
           gotestsum --junitfile $home\junit\unit-tests.xml -- -race -short github.com/networkservicemesh/sdk/pkg/networkservice/common/heal
   test-osx:
     name: test-osx
@@ -46,4 +48,54 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
+          export  GOFLAGS="-count=10"
+          ${GOPATH}/bin/gotestsum --junitfile ~/junit/unit-tests.xml -- -race -short github.com/networkservicemesh/sdk/pkg/networkservice/common/heal
+
+  test-1-14-6:
+    name: test-1-14-6
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.6
+      - name: Install gotestsum
+        run: go get gotest.tools/gotestsum@v0.4.0
+      - name: Run tests
+        run: |
+          eval $(go env)
+          mkdir -p ~/junit/
+          export  GOFLAGS="-count=10"
+          ${GOPATH}/bin/gotestsum --junitfile ~/junit/unit-tests.xml -- -race -short github.com/networkservicemesh/sdk/pkg/networkservice/common/heal
+  test-win-1-14-6:
+    name: test-win-1-14-6
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.6
+      - name: Install gotestsum
+        run: go get gotest.tools/gotestsum@v0.4.0
+      - name: Run tests
+        run: |
+          $env:Path += ";$(go env GOPATH)\bin"
+          mkdir $home/junit
+          SET GOFLAGS="-count=10"
+          gotestsum --junitfile $home\junit\unit-tests.xml -- -race -short github.com/networkservicemesh/sdk/pkg/networkservice/common/heal
+  test-osx-1-14-6:
+    name: test-osx-1-14-6
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.6
+      - name: Install gotestsum
+        run: go get gotest.tools/gotestsum@v0.4.0
+      - name: Run tests
+        run: |
+          eval $(go env)
+          mkdir -p ~/junit/
+          export  GOFLAGS="-count=10"
           ${GOPATH}/bin/gotestsum --junitfile ~/junit/unit-tests.xml -- -race -short github.com/networkservicemesh/sdk/pkg/networkservice/common/heal
