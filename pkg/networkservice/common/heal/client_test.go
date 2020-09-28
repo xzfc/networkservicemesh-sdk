@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	waitForTimeout = 50 * time.Millisecond
+	waitForTimeout = 5 * time.Second
 	tickTimeout    = 10 * time.Millisecond
 )
 
