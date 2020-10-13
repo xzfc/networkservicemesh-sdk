@@ -22,8 +22,11 @@ import (
 	"io/ioutil"
 	"testing"
 	"time"
+	"fmt"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 
 	"go.uber.org/goleak"
 
@@ -34,6 +37,8 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"github.com/networkservicemesh/api/pkg/api/registry"
 
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 )
 
@@ -139,4 +144,89 @@ func TestNSMGR_LocalUsecase(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, conn2)
 	require.Equal(t, 5, len(conn2.Path.PathSegments))
+}
+
+func TestNSMGR_Chain(t *testing.T) {
+	nodesCount := 4
+
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	logrus.SetOutput(ioutil.Discard)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	domain := sandbox.NewBuilder(t).
+		SetNodesCount(nodesCount).
+		SetContext(ctx).
+		SetRegistryProxySupplier(nil).
+		Build()
+	defer domain.Cleanup()
+
+	for i := 0; i < nodesCount; i++ {
+		additionalFunctionality := []networkservice.NetworkServiceServer{}
+		if i != 0 {
+			// Passtrough to the node i-1
+			prevNsc, err := sandbox.NewClient(
+				ctx, sandbox.GenerateTestToken, domain.Nodes[i].NSMgr.URL,
+				NewFwdClient(
+					fmt.Sprintf("my-service-remote-%v", i-1),
+					fmt.Sprintf("endpoint-%v", i-1),
+				),
+			)
+			require.NoError(t, err)
+
+			additionalFunctionality = []networkservice.NetworkServiceServer{
+				adapters.NewClientToServer(prevNsc),
+			}
+		}
+		nseReg := &registry.NetworkServiceEndpoint{
+			Name:                fmt.Sprintf("endpoint-%v", i),
+			NetworkServiceNames: []string{fmt.Sprintf("my-service-remote-%v", i)},
+		}
+		_, err := sandbox.NewEndpoint(ctx, nseReg, sandbox.GenerateTestToken, domain.Nodes[i].NSMgr, additionalFunctionality...)
+		require.NoError(t, err)
+	}
+
+	nsc, err := sandbox.NewClient(ctx, sandbox.GenerateTestToken, domain.Nodes[nodesCount-1].NSMgr.URL)
+	require.NoError(t, err)
+
+	request := &networkservice.NetworkServiceRequest{
+		MechanismPreferences: []*networkservice.Mechanism{
+			{Cls: cls.LOCAL, Type: kernel.MECHANISM},
+		},
+		Connection: &networkservice.Connection{
+			Id:             "1",
+			NetworkService: fmt.Sprintf("my-service-remote-%v", nodesCount-1),
+			Context:        &networkservice.ConnectionContext{},
+		},
+	}
+
+	conn, err := nsc.Request(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+}
+
+
+type FwdClient struct {
+	networkService string
+	networkServiceEndpointName string
+}
+
+func NewFwdClient(networkService, networkServiceEndpointName string) *FwdClient {
+	return &FwdClient{
+		networkService: networkService,
+		networkServiceEndpointName: networkServiceEndpointName,
+	}
+}
+
+func (q *FwdClient) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
+	fmt.Printf("Forwarding to -> %s\n", q.networkService)
+	request = request.Clone()
+	request.Connection.NetworkService = q.networkService
+	request.Connection.NetworkServiceEndpointName = q.networkServiceEndpointName
+	return next.Client(ctx).Request(ctx, request, opts...)
+}
+
+func (q *FwdClient) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (*empty.Empty, error) {
+	conn = conn.Clone()
+	conn.NetworkService = q.networkService
+	return next.Client(ctx).Close(ctx, conn, opts...)
 }
