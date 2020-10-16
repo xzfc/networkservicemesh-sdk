@@ -35,6 +35,8 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/registry"
 
 	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
+	"github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/grpc/credentials"
 )
 
 func TestNSMGR_RemoteUsecase(t *testing.T) {
@@ -90,7 +92,7 @@ func TestNSMGR_RemoteUsecase(t *testing.T) {
 	require.Equal(t, 8, len(conn.Path.PathSegments))
 }
 
-func TestNSMGR_LocalUsecase(t *testing.T) {
+func TestNSMGR_Slow(t *testing.T) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 	logrus.SetOutput(ioutil.Discard)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -102,14 +104,17 @@ func TestNSMGR_LocalUsecase(t *testing.T) {
 		Build()
 	defer domain.Cleanup()
 
+	generateToken := func(_ credentials.AuthInfo) (tokenValue string, expireTime time.Time, err error) {
+		return "TestToken", time.Now().UTC().Add(100 * time.Millisecond), nil
+	}
 	nseReg := &registry.NetworkServiceEndpoint{
 		Name:                "final-endpoint",
 		NetworkServiceNames: []string{"my-service-remote"},
 	}
-	_, err := sandbox.NewEndpoint(ctx, nseReg, sandbox.GenerateTestToken, domain.Nodes[0].NSMgr)
+	_, err := sandbox.NewEndpoint(ctx, nseReg, sandbox.GenerateTestToken, domain.Nodes[0].NSMgr, &SlowEndpoint{})
 	require.NoError(t, err)
 
-	nsc, err := sandbox.NewClient(ctx, sandbox.GenerateTestToken, domain.Nodes[0].NSMgr.URL)
+	nsc, err := sandbox.NewClient(ctx, generateToken, domain.Nodes[0].NSMgr.URL)
 	require.NoError(t, err)
 
 	request := &networkservice.NetworkServiceRequest{
@@ -140,3 +145,15 @@ func TestNSMGR_LocalUsecase(t *testing.T) {
 	require.NotNil(t, conn2)
 	require.Equal(t, 5, len(conn2.Path.PathSegments))
 }
+
+type SlowEndpoint struct {}
+
+func (s SlowEndpoint) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
+	time.Sleep(time.Second)
+	return request.Connection, nil
+}
+
+func (s SlowEndpoint) Close(ctx context.Context, connection *networkservice.Connection) (*empty.Empty, error) {
+	return &empty.Empty{}, nil
+}
+
