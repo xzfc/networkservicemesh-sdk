@@ -22,25 +22,38 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/networkservicemesh/api/pkg/api/registry"
 	"google.golang.org/grpc"
-
-	"github.com/networkservicemesh/sdk/pkg/registry/core/next"
 )
 
 type contextNSEClient struct{}
 
 func (c *contextNSEClient) Register(ctx context.Context, in *registry.NetworkServiceEndpoint, opts ...grpc.CallOption) (*registry.NetworkServiceEndpoint, error) {
-	captureContext(ctx)
-	return next.NetworkServiceEndpointRegistryClient(ctx).Register(ctx, in, opts...)
+	ctx2 := ctx.Value(serverContextKey).(*nextServerCtx)
+	return ctx2.next.Register(context.WithValue(ctx, serverContextKey, ctx2.old), in)
+}
+
+type something struct {
+	registry.NetworkServiceRegistry_FindClient
+}
+
+func (s something) Recv() (*registry.NetworkServiceEndpoint, error) {
+	panic("implement me")
 }
 
 func (c *contextNSEClient) Find(ctx context.Context, in *registry.NetworkServiceEndpointQuery, opts ...grpc.CallOption) (registry.NetworkServiceEndpointRegistry_FindClient, error) {
-	captureContext(ctx)
-	return next.NetworkServiceEndpointRegistryClient(ctx).Find(ctx, in, opts...)
+	ctx2 := ctx.Value(serverContextKey).(*nextServerCtx)
+
+	s := &something{}
+
+	wtf := context.WithValue(ctx, serverContextKey, ctx2.old)
+	_ = wtf
+
+	_ = ctx2.next.Find(in, s)
+	return s, nil
 }
 
 func (c *contextNSEClient) Unregister(ctx context.Context, in *registry.NetworkServiceEndpoint, opts ...grpc.CallOption) (*empty.Empty, error) {
-	captureContext(ctx)
-	return next.NetworkServiceEndpointRegistryClient(ctx).Unregister(ctx, in, opts...)
+	ctx2 := ctx.Value(serverContextKey).(*nextServerCtx)
+	return ctx2.next.Unregister(context.WithValue(ctx, serverContextKey, ctx2.old), in)
 }
 
 var _ registry.NetworkServiceEndpointRegistryClient = &contextNSEClient{}
