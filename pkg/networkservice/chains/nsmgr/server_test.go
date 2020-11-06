@@ -134,9 +134,13 @@ func TestNSMGR_PassThroughRemote(t *testing.T) {
 		Build()
 	defer domain.Cleanup()
 
+	counter := &counterServer{}
+
 	for i := 0; i < nodesCount; i++ {
 		additionalFunctionality := []networkservice.NetworkServiceServer{}
-		if i != 0 {
+		if i == 0 {
+			additionalFunctionality = []networkservice.NetworkServiceServer{counter}
+		} else {
 			// Passtrough to the node i-1
 			additionalFunctionality = []networkservice.NetworkServiceServer{
 				adapters.NewClientToServer(
@@ -178,6 +182,11 @@ func TestNSMGR_PassThroughRemote(t *testing.T) {
 	// Path length to first endpoint is 5
 	// Path length from NSE client to other remote endpoint is 8
 	require.Equal(t, 8*(nodesCount-1)+5, len(conn.Path.PathSegments))
+
+	require.Equal(t, 1, counter.Requests)
+
+	nsc.Close(ctx, conn)
+	require.Equal(t, 1, counter.Closes)
 }
 
 func TestNSMGR_PassThroughLocal(t *testing.T) {
@@ -244,6 +253,8 @@ type passThroughClient struct {
 	networkService             string
 	networkServiceEndpointName string
 	connectTo                  *url.URL
+
+	conn *networkservice.Connection
 }
 
 func newPassTroughClient(mechanismPreferences []*networkservice.Mechanism, networkService, networkServiceEndpointName string, connectTo *url.URL) *passThroughClient {
@@ -278,6 +289,7 @@ func (p *passThroughClient) Request(ctx context.Context, request *networkservice
 	if err != nil {
 		return nil, err
 	}
+	p.conn = conn
 
 	request.Connection.Path.Index += conn.Path.Index
 	request.Connection.Path.PathSegments = append(request.Connection.Path.PathSegments, conn.Path.PathSegments...)
@@ -286,6 +298,21 @@ func (p *passThroughClient) Request(ctx context.Context, request *networkservice
 }
 
 func (p *passThroughClient) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (*empty.Empty, error) {
+	newCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	nsc, err := sandbox.NewClient(
+		newCtx, sandbox.GenerateTestToken, p.connectTo,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = nsc.Close(newCtx, p.conn)
+	if err != nil {
+		return nil, err
+	}
+
 	conn = conn.Clone()
 	return next.Client(ctx).Close(ctx, conn, opts...)
 }
