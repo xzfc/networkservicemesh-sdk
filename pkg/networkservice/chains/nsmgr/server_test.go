@@ -45,66 +45,30 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 )
 
-func TestNSMGR_RemoteUsecase(t *testing.T) {
-	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-	logrus.SetOutput(ioutil.Discard)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	domain := sandbox.NewBuilder(t).
-		SetNodesCount(2).
-		SetRegistryProxySupplier(nil).
-		SetContext(ctx).
-		Build()
-	defer domain.Cleanup()
-
-	nseReg := &registry.NetworkServiceEndpoint{
-		Name:                "final-endpoint",
-		NetworkServiceNames: []string{"my-service-remote"},
-	}
-
-	_, err := sandbox.NewEndpoint(ctx, nseReg, sandbox.GenerateTestToken, domain.Nodes[0].NSMgr)
-	require.NoError(t, err)
-
-	request := &networkservice.NetworkServiceRequest{
-		MechanismPreferences: []*networkservice.Mechanism{
-			{Cls: cls.LOCAL, Type: kernel.MECHANISM},
-		},
-		Connection: &networkservice.Connection{
-			Id:             "1",
-			NetworkService: "my-service-remote",
-			Context:        &networkservice.ConnectionContext{},
-		},
-	}
-
-	nsc, err := sandbox.NewClient(ctx, sandbox.GenerateTestToken, domain.Nodes[1].NSMgr.URL)
-	require.NoError(t, err)
-
-	conn, err := nsc.Request(ctx, request)
-	require.NoError(t, err)
-	require.NotNil(t, conn)
-
-	require.Equal(t, 8, len(conn.Path.PathSegments))
-
-	// Simulate refresh from client.
-
-	refreshRequest := request.Clone()
-	refreshRequest.GetConnection().Context = conn.Context
-	refreshRequest.GetConnection().Mechanism = conn.Mechanism
-	refreshRequest.GetConnection().NetworkServiceEndpointName = conn.NetworkServiceEndpointName
-
-	conn, err = nsc.Request(ctx, refreshRequest)
-	require.NoError(t, err)
-	require.NotNil(t, conn)
-	require.Equal(t, 8, len(conn.Path.PathSegments))
+func TestNSMGR_OneHop(t *testing.T) {
+	t.Run("Local", func(t *testing.T) { testOneHop(t, false) })
+	t.Run("Remote", func(t *testing.T) { testOneHop(t, true) })
 }
 
-func TestNSMGR_LocalUsecase(t *testing.T) {
+func testOneHop(t *testing.T, remote bool) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 	logrus.SetOutput(ioutil.Discard)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+
+	var nodesCount, nscNode, expectedPathSegments int
+	if remote {
+		nodesCount = 2
+		nscNode = 1
+		expectedPathSegments = 8
+	} else {
+		nodesCount = 1
+		nscNode = 0
+		expectedPathSegments = 5
+	}
+
 	domain := sandbox.NewBuilder(t).
-		SetNodesCount(1).
+		SetNodesCount(nodesCount).
 		SetContext(ctx).
 		SetRegistryProxySupplier(nil).
 		Build()
@@ -114,10 +78,12 @@ func TestNSMGR_LocalUsecase(t *testing.T) {
 		Name:                "final-endpoint",
 		NetworkServiceNames: []string{"my-service-remote"},
 	}
-	_, err := sandbox.NewEndpoint(ctx, nseReg, sandbox.GenerateTestToken, domain.Nodes[0].NSMgr)
+
+	counter := &counterServer{}
+	_, err := sandbox.NewEndpoint(ctx, nseReg, sandbox.GenerateTestToken, domain.Nodes[0].NSMgr, counter)
 	require.NoError(t, err)
 
-	nsc, err := sandbox.NewClient(ctx, sandbox.GenerateTestToken, domain.Nodes[0].NSMgr.URL)
+	nsc, err := sandbox.NewClient(ctx, sandbox.GenerateTestToken, domain.Nodes[nscNode].NSMgr.URL)
 	require.NoError(t, err)
 
 	request := &networkservice.NetworkServiceRequest{
@@ -130,23 +96,28 @@ func TestNSMGR_LocalUsecase(t *testing.T) {
 			Context:        &networkservice.ConnectionContext{},
 		},
 	}
+
+	// First request.
 	conn, err := nsc.Request(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, conn)
-
-	require.Equal(t, 5, len(conn.Path.PathSegments))
+	require.Equal(t, expectedPathSegments, len(conn.Path.PathSegments))
+	require.Equal(t, 1, counter.Requests)
 
 	// Simulate refresh from client.
-
 	refreshRequest := request.Clone()
-	refreshRequest.GetConnection().Context = conn.Context
-	refreshRequest.GetConnection().Mechanism = conn.Mechanism
-	refreshRequest.GetConnection().NetworkServiceEndpointName = conn.NetworkServiceEndpointName
-
+	refreshRequest.Connection = conn.Clone()
 	conn2, err := nsc.Request(ctx, refreshRequest)
 	require.NoError(t, err)
 	require.NotNil(t, conn2)
-	require.Equal(t, 5, len(conn2.Path.PathSegments))
+	require.Equal(t, expectedPathSegments, len(conn2.Path.PathSegments))
+	require.Equal(t, 2, counter.Requests)
+
+	// Close.
+	e, err := nsc.Close(ctx, conn2)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+	require.Equal(t, 1, counter.Closes)
 }
 
 func TestNSMGR_PassThroughRemote(t *testing.T) {
@@ -317,4 +288,18 @@ func (p *passThroughClient) Request(ctx context.Context, request *networkservice
 func (p *passThroughClient) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (*empty.Empty, error) {
 	conn = conn.Clone()
 	return next.Client(ctx).Close(ctx, conn, opts...)
+}
+
+type counterServer struct {
+	Requests, Closes int
+}
+
+func (c *counterServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
+	c.Requests++
+	return next.Server(ctx).Request(ctx, request)
+}
+
+func (c *counterServer) Close(ctx context.Context, connection *networkservice.Connection) (*empty.Empty, error) {
+	c.Closes++
+	return next.Server(ctx).Close(ctx, connection)
 }
