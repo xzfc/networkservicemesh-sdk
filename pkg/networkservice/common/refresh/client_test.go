@@ -18,22 +18,16 @@ package refresh_test
 
 import (
 	"context"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/sirupsen/logrus"
+	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
-	"google.golang.org/grpc"
-
-	"github.com/networkservicemesh/api/pkg/api/networkservice"
 
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
 const (
@@ -107,40 +101,6 @@ func TestRefreshClient_StopRefreshAtAnotherRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Never(t, cloneClient.validator(3), neverTimeout, tickTimeout)
-}
-
-type countClient struct {
-	t     *testing.T
-	count int32
-}
-
-func (c *countClient) validator(atLeast int32) func() bool {
-	return func() bool {
-		if count := atomic.LoadInt32(&c.count); count < atLeast {
-			logrus.Warnf("count %v < atLeast %v", count, atLeast)
-			return false
-		}
-		return true
-	}
-}
-
-func (c *countClient) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
-	request = request.Clone()
-	conn := request.GetConnection()
-
-	if atomic.AddInt32(&c.count, 1) == 1 {
-		conn.NetworkServiceEndpointName = endpointName
-	} else {
-		require.Equal(c.t, endpointName, conn.NetworkServiceEndpointName)
-	}
-
-	setExpires(conn, expireTimeout)
-
-	return next.Client(ctx).Request(ctx, request, opts...)
-}
-
-func (c *countClient) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (*empty.Empty, error) {
-	return next.Client(ctx).Close(ctx, conn, opts...)
 }
 
 func setExpires(conn *networkservice.Connection, expireTimeout time.Duration) {

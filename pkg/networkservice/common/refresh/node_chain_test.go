@@ -50,7 +50,7 @@ func TestNope(t *testing.T) {
 	initClient := null.NewClient()
 	client := testCreateChain(ctx, initClient)
 
-	request := mkRequest(0, 0)
+	request := mkRequest(0, 0, nil)
 	rv, err := client.Request(ctx, request.Clone())
 	require.Nil(t, err)
 	fmt.Println(rv)

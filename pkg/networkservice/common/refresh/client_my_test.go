@@ -235,9 +235,10 @@ func TestNewClient_Stress(t *testing.T) {
 		updatetoken.NewClient(sandbox.GenerateExpiringToken(somethingExpire)),
 		adapters.NewServerToClient(refreshSrv))
 
-	closed := true
+	var oldConn *networkservice.Connection
 	for i := 0; i < 1000 && !t.Failed(); i++ {
 		if i % 100 == 0 {
+			// TODO: use t.Logf?
 			fmt.Println()
 		}
 		if i % 10 == 0 {
@@ -245,11 +246,11 @@ func TestNewClient_Stress(t *testing.T) {
 		}
 
 		refreshSrv.beforeRequest(strconv.Itoa(i))
-		conn, err := client.Request(ctx, mkRequest(0, i))
+		conn, err := client.Request(ctx, mkRequest(0, i, oldConn))
 		refreshSrv.afterRequest()
+		assert.NotNil(t, conn)
 		assert.Nil(t, err)
-		_ = conn
-		closed = false
+		oldConn = conn
 
 		if t.Failed() {
 			break
@@ -261,16 +262,17 @@ func TestNewClient_Stress(t *testing.T) {
 
 		if rand.Int31n(10) == 0 {
 			refreshSrv.beforeClose()
-			_, _ = client.Close(ctx, mkConn(0, i))
+			_, err = client.Close(ctx, oldConn)
+			assert.Nil(t, err)
 			refreshSrv.afterClose()
-			closed = true
+			oldConn = nil
 		}
 	}
 	fmt.Println()
 
-	if !closed {
+	if oldConn != nil {
 		refreshSrv.beforeClose()
-		_, _ = client.Close(ctx, mkConn(0, 0))
+		_, _ = client.Close(ctx, oldConn)
 		refreshSrv.afterClose()
 	}
 	time.Sleep(somethingClientStep)

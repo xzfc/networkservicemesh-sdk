@@ -58,23 +58,24 @@ func (t *testNSC) Close(ctx context.Context, in *networkservice.Connection, opts
 	}
 }
 
-func mkConn(id int, label int) *networkservice.Connection {
-	return &networkservice.Connection{
-		Id:      "conn-" + strconv.Itoa(id),
-		Context: &networkservice.ConnectionContext{
-			ExtraContext: map[string]string{
-				"refresh": strconv.Itoa(label),
+func mkRequest(id, marker int, conn *networkservice.Connection) *networkservice.NetworkServiceRequest {
+	if conn == nil {
+		conn = &networkservice.Connection{
+			Id:      "conn-" + strconv.Itoa(id),
+			Context: &networkservice.ConnectionContext{
+				ExtraContext: map[string]string{
+					"refresh": strconv.Itoa(marker),
+				},
 			},
-		},
-		NetworkService: "my-service-remote",
+			NetworkService: "my-service-remote",
+		}
+	} else {
+		conn.Context.ExtraContext["refresh"] = strconv.Itoa(marker)
 	}
-}
-
-func mkRequest(id, label int) *networkservice.NetworkServiceRequest {
 	return &networkservice.NetworkServiceRequest{
 		MechanismPreferences: []*networkservice.Mechanism{
 			{Cls: cls.LOCAL, Type: kernel.MECHANISM},
 		},
-		Connection: mkConn(id, label),
+		Connection: conn,
 	}
 }
