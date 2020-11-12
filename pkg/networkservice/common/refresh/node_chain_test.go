@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/utils/null"
 )
 
 func testToken(_ credentials.AuthInfo) (tokenValue string, expireTime time.Time, err error) {
