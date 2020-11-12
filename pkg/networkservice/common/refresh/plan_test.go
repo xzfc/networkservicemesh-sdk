@@ -61,7 +61,6 @@ func TestFoo(t *testing.T) {
 }
 
 // TestSerial checks that requests/closes with a same ID are performed sequentially.
-// TODO: test fails due to unimplemented proper merge compare
 func TestSerial(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -168,7 +167,6 @@ func TestParallel(t *testing.T) {
 	require.Eventually(t, func() bool {
 		mut.Lock()
 		defer mut.Unlock()
-		fmt.Printf("%#v\n\n", actual)
 		return assert.ObjectsAreEqual(expected, actual)
 	}, 2 * time.Second, tickTimeout)
 
@@ -183,7 +181,6 @@ func TestParallel(t *testing.T) {
 	require.Eventually(t, func() bool {
 		mut.Lock()
 		defer mut.Unlock()
-		fmt.Printf("%#v\n\n", actual)
 		return assert.ObjectsAreEqual(expected, actual)
 	}, 2 * time.Second, tickTimeout)
 }

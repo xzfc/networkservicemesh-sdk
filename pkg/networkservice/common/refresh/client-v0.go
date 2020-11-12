@@ -22,19 +22,18 @@ import (
 	"context"
 	"time"
 
+	"github.com/edwarnicke/serialize"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"google.golang.org/grpc"
-
-	"github.com/edwarnicke/serialize"
 
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/trace"
 	"github.com/networkservicemesh/sdk/pkg/tools/extend"
 )
 
-type refreshClient_v1 struct {
+type refreshClient_v0 struct {
 	ctx      context.Context
 	timers   map[string]*time.Timer        // key == request.GetConnection.GetId()
 	cancels  map[string]context.CancelFunc // key == request.GetConnection.GetId()
@@ -43,8 +42,8 @@ type refreshClient_v1 struct {
 
 // NewClient - creates new NetworkServiceClient chain element for refreshing connections before they timeout at the
 // endpoint
-func NewClient_v1(ctx context.Context) networkservice.NetworkServiceClient {
-	rv := &refreshClient_v1{
+func NewClient_v0(ctx context.Context) networkservice.NetworkServiceClient {
+	rv := &refreshClient_v0{
 		ctx:     ctx,
 		timers:  make(map[string]*time.Timer),
 		cancels: make(map[string]context.CancelFunc),
@@ -52,7 +51,7 @@ func NewClient_v1(ctx context.Context) networkservice.NetworkServiceClient {
 	return rv
 }
 
-func (t *refreshClient_v1) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
+func (t *refreshClient_v0) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
 	rv, err := next.Client(ctx).Request(ctx, request, opts...)
 	if err != nil {
 		return nil, err
@@ -64,7 +63,7 @@ func (t *refreshClient_v1) Request(ctx context.Context, request *networkservice.
 
 	// Create refreshRequest
 	refreshRequest := request.Clone()
-	refreshRequest.Connection = rv.Clone()
+	request.Connection = rv.Clone()
 
 	// TODO - introduce random noise into duration avoid timer lock
 	duration := time.Until(expireTime) / 3
@@ -76,10 +75,8 @@ func (t *refreshClient_v1) Request(ctx context.Context, request *networkservice.
 			refreshCtx, cancel = context.WithDeadline(refreshCtx, deadline.Add(duration))
 		}
 
-		connID := refreshRequest.GetConnection().GetId()
-
 		// Stop any existing timers
-		if timer, ok := t.timers[connID]; ok {
+		if timer, ok := t.timers[request.GetConnection().GetId()]; ok {
 			timer.Stop()
 		}
 
@@ -88,7 +85,7 @@ func (t *refreshClient_v1) Request(ctx context.Context, request *networkservice.
 		timer = time.AfterFunc(duration, func() {
 			<-t.executor.AsyncExec(func() {
 				// Check to see if we've been superseded by another timer, if so, do nothing
-				currentTimer, ok := t.timers[connID]
+				currentTimer, ok := t.timers[refreshRequest.GetConnection().GetId()]
 				if ok && currentTimer != timer {
 					cancel()
 					return
@@ -101,19 +98,19 @@ func (t *refreshClient_v1) Request(ctx context.Context, request *networkservice.
 			default:
 				if _, err := t.Request(refreshCtx, refreshRequest, opts...); err != nil {
 					// TODO - do we want to retry at 2/3 and 3/3 if we fail here?
-					trace.Log(refreshCtx).Errorf("Error while attempting to refresh connection %s: %+v", connID, err)
+					trace.Log(refreshCtx).Errorf("Error while attempting to refresh connection %s: %+v", request.GetConnection().GetId(), err)
 				}
 			}
 			// Set timer to nil to be really really sure we don't have a circular reference that precludes garbage collection
 			timer = nil
 		})
-		t.timers[connID] = timer
-		t.cancels[connID] = cancel
+		t.timers[request.GetConnection().GetId()] = timer
+		t.cancels[request.GetConnection().GetId()] = cancel
 	})
 	return rv, nil
 }
 
-func (t *refreshClient_v1) Close(ctx context.Context, conn *networkservice.Connection, _ ...grpc.CallOption) (*empty.Empty, error) {
+func (t *refreshClient_v0) Close(ctx context.Context, conn *networkservice.Connection, _ ...grpc.CallOption) (*empty.Empty, error) {
 	t.executor.AsyncExec(func() {
 		if cancel, ok := t.cancels[conn.GetId()]; ok {
 			cancel()
