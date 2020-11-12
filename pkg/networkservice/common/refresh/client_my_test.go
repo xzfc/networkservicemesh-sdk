@@ -79,24 +79,6 @@ func (t *testRefresh) Close(context.Context, *networkservice.Connection, ...grpc
 	return &empty.Empty{}, nil
 }
 
-/*
-func setExpires(conn *networkservice.Connection, expireTimeout time.Duration) {
-	expireTime := time.Now().Add(expireTimeout)
-	expires := &timestamp.Timestamp{
-		Seconds: expireTime.Unix(),
-		Nanos:   int32(expireTime.Nanosecond()),
-	}
-	conn.Path = &networkservice.Path{
-		Index: 0,
-		PathSegments: []*networkservice.PathSegment{
-			{
-				Expires: expires,
-			},
-		},
-	}
-}
- */
-
 func hasValue(c <-chan struct{}) bool {
 	select {
 	case <-c:
@@ -115,45 +97,8 @@ func firstGetsValueEarlier(c1, c2 <-chan struct{}) bool {
 	}
 }
 
-func TestNewClient_StopRefreshAtClose(t *testing.T) {
-	// t.Skip("https://github.com/networkservicemesh/sdk/issues/237")
-	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-	requestCh := make(chan struct{}, 1)
-	testRefresh := &testRefresh{
-		RequestFunc: func(ctx context.Context, in *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (connection *networkservice.Connection, err error) {
-			setExpires(in.GetConnection(), expireTimeout)
-			requestCh <- struct{}{}
-			return in.GetConnection(), nil
-		},
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	client := next.NewNetworkServiceClient(refresh.NewClient(ctx), testRefresh)
-	request := &networkservice.NetworkServiceRequest{
-		Connection: &networkservice.Connection{
-			Id: "conn-1",
-		},
-	}
-	conn, err := client.Request(context.Background(), request)
-	assert.Nil(t, err)
-
-	assert.True(t, hasValue(requestCh)) // receive value from initial request
-	for i := 0; i < refreshCount; i++ {
-		require.Eventually(t, func() bool { return hasValue(requestCh) }, waitForTimeout, tickTimeout)
-	}
-
-	_, err = client.Close(context.Background(), conn)
-	assert.Nil(t, err)
-
-	absence := make(chan struct{})
-	time.AfterFunc(expectAbsenceTimeout, func() {
-		absence <- struct{}{}
-	})
-	assert.True(t, firstGetsValueEarlier(absence, requestCh))
-}
-
 func TestNewClient_StopRefreshAtAnotherRequest(t *testing.T) {
-	// t.Skip("https://github.com/networkservicemesh/sdk/issues/260")
+	t.Skip("https://github.com/networkservicemesh/sdk/issues/260")
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 	requestCh := make(chan struct{}, 1)
 	testRefresh := &testRefresh{
@@ -202,9 +147,10 @@ func TestNewClient_StopRefreshAtAnotherRequest(t *testing.T) {
 
 
 const (
-	somethingExpire = 10 * time.Millisecond
-	somethingDeadline = 20 * time.Millisecond
-	somethingClientStep = 32 * time.Millisecond
+	stressExpireTimeout = 10 * time.Millisecond
+	stressMinDuration   = stressExpireTimeout / 5
+	stressMaxDuration   = stressExpireTimeout * 3 / 2
+	stressTick          = 32 * time.Millisecond
 )
 
 // TestNewClient_Stress is a stress-test to reveal race-conditions when a request and a
@@ -225,15 +171,15 @@ func TestNewClient_Stress(t *testing.T) {
 
 	rand := rand.New(rand.NewSource(0))
 
-	refreshSrv := newRefreshTesterServer(t, somethingExpire / 5, somethingExpire * 3 / 2)
+	refreshTester := newRefreshTesterServer(t, stressMinDuration, stressMaxDuration)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := next.NewNetworkServiceClient(
 		updatepath.NewClient("foo"),
 		refresh.NewClient(ctx),
-		updatetoken.NewClient(sandbox.GenerateExpiringToken(somethingExpire)),
-		adapters.NewServerToClient(refreshSrv))
+		updatetoken.NewClient(sandbox.GenerateExpiringToken(stressExpireTimeout)),
+		adapters.NewServerToClient(refreshTester))
 
 	var oldConn *networkservice.Connection
 	for i := 0; i < 1000 && !t.Failed(); i++ {
@@ -245,9 +191,9 @@ func TestNewClient_Stress(t *testing.T) {
 			fmt.Printf("%v,", i)
 		}
 
-		refreshSrv.beforeRequest(strconv.Itoa(i))
+		refreshTester.beforeRequest(strconv.Itoa(i))
 		conn, err := client.Request(ctx, mkRequest(0, i, oldConn))
-		refreshSrv.afterRequest()
+		refreshTester.afterRequest()
 		assert.NotNil(t, conn)
 		assert.Nil(t, err)
 		oldConn = conn
@@ -257,27 +203,28 @@ func TestNewClient_Stress(t *testing.T) {
 		}
 
 		if rand.Int31n(10) != 0 {
-			time.Sleep(somethingClientStep)
+			time.Sleep(stressTick)
 		}
 
 		if rand.Int31n(10) == 0 {
-			refreshSrv.beforeClose()
+			refreshTester.beforeClose()
 			_, err = client.Close(ctx, oldConn)
 			assert.Nil(t, err)
-			refreshSrv.afterClose()
+			refreshTester.afterClose()
 			oldConn = nil
 		}
 	}
 	fmt.Println()
 
 	if oldConn != nil {
-		refreshSrv.beforeClose()
+		refreshTester.beforeClose()
 		_, _ = client.Close(ctx, oldConn)
-		refreshSrv.afterClose()
+		refreshTester.afterClose()
 	}
-	time.Sleep(somethingClientStep)
+	time.Sleep(stressTick)
 }
 
+// TODO: drop this test
 func TestNewClient_Reuse(t *testing.T) {
 	testRefresh := &testNSC{
 		RequestFunc: func(r *testNSCRequest) {

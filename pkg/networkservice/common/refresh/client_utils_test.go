@@ -14,8 +14,6 @@ import (
 	"time"
 )
 
-// countClient is used to check that refresh updates the request.Connection
-// field (issue #530).
 type countClient struct {
 	t     *testing.T
 	count int32
@@ -35,14 +33,12 @@ func (c *countClient) Request(ctx context.Context, request *networkservice.Netwo
 	request = request.Clone()
 	conn := request.GetConnection()
 
+	// Check that refresh updates the request.Connection field (issue #530).
 	if atomic.AddInt32(&c.count, 1) == 1 {
 		conn.NetworkServiceEndpointName = endpointName
 	} else {
 		require.Equal(c.t, endpointName, conn.NetworkServiceEndpointName)
 	}
-
-	// TODO: remove setExpires, use updateToken instead
-	setExpires(conn, expireTimeout)
 
 	return next.Client(ctx).Request(ctx, request, opts...)
 }
@@ -58,8 +54,7 @@ func (c *countClient) Close(ctx context.Context, conn *networkservice.Connection
 //
 // Usage details:
 // * Each client Request() should be wrapped in beforeRequest()/afterRequest()
-//   calls.
-// * Same for Close() and beforeClose()/afterClose().
+//   calls. Same for Close() and beforeClose()/afterClose().
 // * Caveat: parallel client initiated requests aren't supported by this tester.
 // * To distinguish between different requests, the value of
 //   `Connection.Context.ExtraContext["refresh"]` is used as a marker.
