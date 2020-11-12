@@ -146,10 +146,10 @@ func TestNewClient_StopRefreshAtAnotherRequest(t *testing.T) {
 }
 
 const (
-	stressExpireTimeout = 10 * time.Millisecond
+	stressExpireTimeout = 25 * time.Millisecond
 	stressMinDuration   = stressExpireTimeout / 5
 	stressMaxDuration   = stressExpireTimeout * 3 / 2
-	stressTick          = 32 * time.Millisecond
+	stressTick          = 82 * time.Millisecond
 )
 
 // TestNewClient_Stress is a stress-test to reveal race-conditions when a request and a

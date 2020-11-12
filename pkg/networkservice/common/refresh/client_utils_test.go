@@ -145,7 +145,7 @@ func (t *refreshTesterServer) afterClose() {
 func (t *refreshTesterServer) checkUnlocked() {
 	if t.state == testRefreshStateDoneRequest || t.state == testRefreshStateRunning {
 		delta := time.Now().UTC().Sub(t.lastSeen)
-		require.Less(t.t, int64(delta), int64(t.maxDuration), "Duration expired (too slow) delta=%v max=%v", delta, t.maxDuration)
+		require.Lessf(t.t, int64(delta), int64(t.maxDuration), "Duration expired (too slow) delta=%v max=%v", delta, t.maxDuration)
 	}
 }
 
@@ -165,7 +165,8 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 		}
 	case testRefreshStateDoneRequest, testRefreshStateRunning, testRefreshStateWaitClose:
 		require.Equal(t.t, t.currentMarker, marker, "Unexpected marker")
-		require.Greater(t.t, int64(time.Now().UTC().Sub(t.lastSeen)), int64(t.minDuration), "Too fast")
+		delta := time.Now().UTC().Sub(t.lastSeen)
+		require.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
 	default:
 		require.Fail(t.t, "Unexpected state", t.state)
 	}
