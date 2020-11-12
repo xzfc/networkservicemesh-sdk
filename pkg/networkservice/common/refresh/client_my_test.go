@@ -43,7 +43,7 @@ import (
 
 const (
 	// expireTimeout        = 100 * time.Millisecond
-	waitForTimeout       = expireTimeout
+	waitForTimeout = expireTimeout
 	// tickTimeout          = 10 * time.Millisecond
 	refreshCount         = 5
 	expectAbsenceTimeout = 5 * expireTimeout
@@ -145,7 +145,6 @@ func TestNewClient_StopRefreshAtAnotherRequest(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-
 const (
 	stressExpireTimeout = 10 * time.Millisecond
 	stressMinDuration   = stressExpireTimeout / 5
@@ -169,7 +168,7 @@ const (
 func TestNewClient_Stress(t *testing.T) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 
-	rand := rand.New(rand.NewSource(0))
+	randSrc := rand.New(rand.NewSource(0))
 
 	refreshTester := newRefreshTesterServer(t, stressMinDuration, stressMaxDuration)
 
@@ -183,11 +182,11 @@ func TestNewClient_Stress(t *testing.T) {
 
 	var oldConn *networkservice.Connection
 	for i := 0; i < 1000 && !t.Failed(); i++ {
-		if i % 100 == 0 {
+		if i%100 == 0 {
 			// TODO: use t.Logf?
 			fmt.Println()
 		}
-		if i % 10 == 0 {
+		if i%10 == 0 {
 			fmt.Printf("%v,", i)
 		}
 
@@ -202,11 +201,11 @@ func TestNewClient_Stress(t *testing.T) {
 			break
 		}
 
-		if rand.Int31n(10) != 0 {
+		if randSrc.Int31n(10) != 0 {
 			time.Sleep(stressTick)
 		}
 
-		if rand.Int31n(10) == 0 {
+		if randSrc.Int31n(10) == 0 {
 			refreshTester.beforeClose()
 			_, err = client.Close(ctx, oldConn)
 			assert.Nil(t, err)
@@ -228,7 +227,7 @@ func TestNewClient_Stress(t *testing.T) {
 func TestNewClient_Reuse(t *testing.T) {
 	testRefresh := &testNSC{
 		RequestFunc: func(r *testNSCRequest) {
-			setExpires(r.in.GetConnection(), 10000 * time.Millisecond)
+			setExpires(r.in.GetConnection(), 10000*time.Millisecond)
 			time.Sleep(500 * time.Millisecond)
 			fmt.Println("!!!")
 		},

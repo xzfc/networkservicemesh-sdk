@@ -1,17 +1,35 @@
+// Copyright (c) 2020 Doc.ai and/or its affiliates.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package refresh_test
 
 import (
 	"context"
-	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/networkservicemesh/api/pkg/api/networkservice"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/networkservicemesh/api/pkg/api/networkservice"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
 type countClient struct {
@@ -76,8 +94,8 @@ const (
 	testRefreshStateInit        = refreshTesterServerState("init")
 	testRefreshStateWaitRequest = refreshTesterServerState("wait-request")
 	testRefreshStateDoneRequest = refreshTesterServerState("done-request")
-	testRefreshStateRunning	    = refreshTesterServerState("running")
-	testRefreshStateWaitClose	= refreshTesterServerState("wait-close")
+	testRefreshStateRunning     = refreshTesterServerState("running")
+	testRefreshStateWaitClose   = refreshTesterServerState("wait-close")
 )
 
 func newRefreshTesterServer(t *testing.T, minDuration, maxDuration time.Duration) *refreshTesterServer {
@@ -136,7 +154,7 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 	defer t.mutex.Unlock()
 	t.checkUnlocked()
 
-	marker, _ := request.Connection.Context.ExtraContext["refresh"]
+	marker := request.Connection.Context.ExtraContext["refresh"]
 	require.NotEmpty(t.t, marker, "Marker is empty")
 
 	switch t.state {

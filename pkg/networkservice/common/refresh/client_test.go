@@ -18,11 +18,6 @@ package refresh_test
 
 import (
 	"context"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
-	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -31,11 +26,16 @@ import (
 
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
+	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 )
 
 const (
@@ -76,7 +76,7 @@ func TestRefreshClient_StopRefreshAtClose(t *testing.T) {
 	require.NoError(t, err)
 
 	count := atomic.LoadInt32(&cloneClient.count)
-	require.Never(t, cloneClient.validator(count + 1), neverTimeout, tickTimeout)
+	require.Never(t, cloneClient.validator(count+1), neverTimeout, tickTimeout)
 }
 
 func TestRefreshClient_StopRefreshAtAnotherRequest(t *testing.T) {
@@ -159,17 +159,17 @@ func TestRefreshClient_Serial(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		wg.Add(2)
 		req := mkRequest(0, i, nil)
-		go func(i int) {
+		go func() {
 			_, err := client.Request(context.Background(), req.Clone())
 			assert.Nil(t, err)
 			wg.Done()
-		}(i)
+		}()
 		time.Sleep(10 * time.Millisecond)
-		go func(i int) {
-			_, err := client.Close(context.Background(), req.Connection)
+		go func() {
+			_, err := client.Close(context.Background(), req.Connection.Clone())
 			assert.Nil(t, err)
 			wg.Done()
-		}(i)
+		}()
 		time.Sleep(10 * time.Millisecond)
 
 		expectedOrder = append(expectedOrder,
@@ -198,14 +198,14 @@ func TestRefreshClient_Parallel(t *testing.T) {
 			time.Sleep(1 * time.Second)
 
 			mut.Lock()
-			actual["request " + r.in.Connection.Id] = true
+			actual["request "+r.in.Connection.Id] = true
 			mut.Unlock()
 		},
 		CloseFunc: func(r *testNSCClose) {
 			time.Sleep(1 * time.Second)
 
 			mut.Lock()
-			actual["close " + r.in.Id] = true
+			actual["close "+r.in.Id] = true
 			mut.Unlock()
 		},
 	}
@@ -215,34 +215,33 @@ func TestRefreshClient_Parallel(t *testing.T) {
 		connCh := make(chan *networkservice.Connection, 1)
 		connChs = append(connChs, connCh)
 		req := mkRequest(i, 0, nil)
-		go func(i int) {
+		go func() {
 			conn, err := client.Request(context.Background(), req)
 			assert.NotNil(t, conn)
 			assert.Nil(t, err)
 			connCh <- conn
-		}(i)
-		expected["request " + req.Connection.Id] = true
+		}()
+		expected["request "+req.Connection.Id] = true
 	}
 	require.Eventually(t, func() bool {
 		mut.Lock()
 		defer mut.Unlock()
 		return assert.ObjectsAreEqual(expected, actual)
-	}, 2 * time.Second, tickTimeout)
-
+	}, 2*time.Second, tickTimeout)
 
 	for i := 0; i < 10; i++ {
 		conn := <-connChs[i]
-		go func(i int) {
+		go func() {
 			_, err := client.Close(context.Background(), conn)
 			assert.Nil(t, err)
-		}(i)
-		expected["close " + conn.Id] = true
+		}()
+		expected["close "+conn.Id] = true
 	}
 	require.Eventually(t, func() bool {
 		mut.Lock()
 		defer mut.Unlock()
 		return assert.ObjectsAreEqual(expected, actual)
-	}, 2 * time.Second, tickTimeout)
+	}, 2*time.Second, tickTimeout)
 }
 
 func setExpires(conn *networkservice.Connection, expireTimeout time.Duration) {

@@ -26,9 +26,9 @@ import (
 	"github.com/edwarnicke/serialize"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"google.golang.org/grpc"
 
-	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
@@ -83,7 +83,7 @@ func (q *refreshClient2) Close(ctx context.Context, conn *networkservice.Connect
 
 func (exec *refreshExecutor) stopTimer() {
 	if exec.timer != nil && exec.timer.Stop() {
-		exec.refs -= 1
+		exec.refs--
 	}
 	exec.timer = nil
 }
@@ -103,25 +103,25 @@ func (q *refreshClient2) startTimer(connectionID string, exec *refreshExecutor, 
 	// made of refreshing clients with the same expiration time: let outer
 	// chain elements refresh slightly faster than inner ones.
 	// Update interval is within 0.2*expirationTime .. 0.4*expirationTime
-	scale := 1./3.
+	scale := 1. / 3.
 	if len(path.PathSegments) > 1 {
-		scale = 0.2 + 0.2 * float64(path.Index) / float64(len(path.PathSegments))
+		scale = 0.2 + 0.2*float64(path.Index)/float64(len(path.PathSegments))
 	}
 	duration := time.Duration(float64(time.Until(expireTime)) * scale)
 
-	exec.refs += 1
+	exec.refs++
 	var timer *time.Timer
 	timer = time.AfterFunc(duration, func() {
 		q.execute(connectionID, func(exec *refreshExecutor) {
 			if timer != exec.timer {
-				// Got an already cancelled timer.
+				// Got an already canceled timer.
 				return
 			}
-			defer func() { exec.refs -= 1 }()
+			defer func() { exec.refs-- }()
 			exec.timer = nil
 
 			if q.ctx.Err() != nil {
-				// Context is cancelled or deadlined.
+				// Context is canceled or deadlined.
 				return
 			}
 
@@ -142,12 +142,12 @@ func (q *refreshClient2) execute(connectionID string, f func(*refreshExecutor)) 
 	exec := execInt.(*refreshExecutor)
 	<-exec.executor.AsyncExec(func() {
 		if loaded {
-			exec.refs += 1
+			exec.refs++
 		}
 
 		f(exec)
 
-		exec.refs -= 1
+		exec.refs--
 		if exec.refs == 0 {
 			q.items.Delete(connectionID)
 		}
