@@ -2,15 +2,11 @@ package refresh_test
 
 import (
 	"context"
-	"fmt"
-	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/cls"
-	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,50 +14,8 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
-func mkConn(id int, label int) *networkservice.Connection {
-	return &networkservice.Connection{
-		Id:      "conn-" + strconv.Itoa(id),
-		Context: &networkservice.ConnectionContext{
-			ExtraContext: map[string]string{
-				"refresh": strconv.Itoa(label),
-			},
-		},
-		NetworkService: "my-service-remote",
-	}
-}
-
-func mkRequest(id, label int) *networkservice.NetworkServiceRequest {
-	return &networkservice.NetworkServiceRequest{
-		MechanismPreferences: []*networkservice.Mechanism{
-			{Cls: cls.LOCAL, Type: kernel.MECHANISM},
-		},
-		Connection: mkConn(id, label),
-	}
-}
-
-func TestFoo(t *testing.T) {
-	testRefresh := &testNSC{
-		RequestFunc: func(r *testNSCRequest) {
-			setExpires(r.in.GetConnection(), time.Millisecond*350)
-		},
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	client := next.NewNetworkServiceClient(refresh.NewClient(ctx), testRefresh)
-
-	rv, err := client.Request(context.Background(), mkRequest(0, 0))
-	fmt.Printf("Test: rv=%#v err=%#v\n", rv, err)
-	time.Sleep(time.Second)
-
-	rv, err = client.Request(context.Background(), mkRequest(0, 0))
-	fmt.Printf("Test: rv=%#v err=%#v\n", rv, err)
-	time.Sleep(time.Second)
-}
-
-// TestSerial checks that requests/closes with a same ID are performed sequentially.
-func TestSerial(t *testing.T) {
+// TestClient_Serial checks that requests/closes with a same ID are performed sequentially.
+func TestClient_Serial(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -128,8 +82,8 @@ func TestSerial(t *testing.T) {
 	assert.Equal(t, expectedOrder, actualOrder)
 }
 
-// TestParallel checks that requests/closes with a distinct ID are performed in parallel.
-func TestParallel(t *testing.T) {
+// TestClient_Parallel checks that requests/closes with a distinct ID are performed in parallel.
+func TestClient_Parallel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

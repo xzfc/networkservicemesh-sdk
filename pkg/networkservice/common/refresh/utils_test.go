@@ -2,6 +2,9 @@ package refresh_test
 
 import (
 	"context"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/cls"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
+	"strconv"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
@@ -52,5 +55,26 @@ func (t *testNSC) Close(ctx context.Context, in *networkservice.Connection, opts
 		return r.e, r.err
 	} else {
 		return &empty.Empty{}, nil
+	}
+}
+
+func mkConn(id int, label int) *networkservice.Connection {
+	return &networkservice.Connection{
+		Id:      "conn-" + strconv.Itoa(id),
+		Context: &networkservice.ConnectionContext{
+			ExtraContext: map[string]string{
+				"refresh": strconv.Itoa(label),
+			},
+		},
+		NetworkService: "my-service-remote",
+	}
+}
+
+func mkRequest(id, label int) *networkservice.NetworkServiceRequest {
+	return &networkservice.NetworkServiceRequest{
+		MechanismPreferences: []*networkservice.Mechanism{
+			{Cls: cls.LOCAL, Type: kernel.MECHANISM},
+		},
+		Connection: mkConn(id, label),
 	}
 }
