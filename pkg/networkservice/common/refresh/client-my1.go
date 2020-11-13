@@ -30,21 +30,19 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/trace"
 )
 
+const doTrace = false
+
 type refreshClient struct {
 	ctx   context.Context
 	mutex sync.Mutex
 
 	items          map[connectionID]*refreshItem
-	timerIDs       map[timerID]connectionID
-	timerIDCounter timerID
 }
 
 type connectionID string
-type timerID int
 
 type refreshItem struct {
 	timer   *time.Timer
-	timerID timerID
 	// repeat is a request that should be performed when the timer fires.
 	repeat *clientRequestItem
 
@@ -97,8 +95,6 @@ func NewClient1(ctx context.Context) networkservice.NetworkServiceClient {
 		ctx:            ctx,
 		mutex:          sync.Mutex{},
 		items:          map[connectionID]*refreshItem{},
-		timerIDs:       map[timerID]connectionID{},
-		timerIDCounter: 0,
 	}
 
 	return result
@@ -139,14 +135,15 @@ func (q *refreshClient) eventClient(req queueItem) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	trace.Log(q.ctx).Infof("\x1b[32m●\x1b[m eventClient %T id=%#v", req, req.connectionID())
+	if doTrace {
+		trace.Log(q.ctx).Infof("\x1b[32m●\x1b[m eventClient %T id=%#v", req, req.connectionID())
+	}
 	id := req.connectionID()
 
 	item, ok := q.items[id]
 	if !ok {
 		item = &refreshItem{
 			timer:   nil,
-			timerID: -1,
 			repeat:  nil,
 			running: nil,
 			queue:   nil,
@@ -159,8 +156,6 @@ func (q *refreshClient) eventClient(req queueItem) {
 		item.timer.Stop()
 		item.timer = nil
 		item.repeat = nil
-		delete(q.timerIDs, item.timerID)
-		item.timerID = -1
 	}
 
 	if !mergeRequests(q.ctx, item.running, req) {
@@ -169,25 +164,19 @@ func (q *refreshClient) eventClient(req queueItem) {
 	}
 }
 
-func (q *refreshClient) eventTimer(timerID timerID) {
+func (q *refreshClient) eventTimer(id connectionID, item *refreshItem, timer **time.Timer) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	trace.Log(q.ctx).Infof("\x1b[32m●\x1b[m eventTimer %v", timerID)
-	id, ok := q.timerIDs[timerID]
-	if !ok {
+	if doTrace {
+		trace.Log(q.ctx).Infof("\x1b[32m●\x1b[m eventTimer %v", id)
+	}
+	if item.timer != *timer {
 		// Got stale timer that is already canceled.
 		trace.Log(q.ctx).Infof("Got canceled timer")
 		return
 	}
-	delete(q.timerIDs, timerID)
-	item, ok := q.items[id]
-	if !ok {
-		trace.Log(q.ctx).Panicf("Timer for non-existing item")
-	}
 	item.timer = nil
-	item.timerID = -1
-	// TODO: assert timerID == item.timerID?
 
 	item.repeat.spawn(q)
 	item.running = item.repeat
@@ -197,7 +186,9 @@ func (q *refreshClient) eventDone(id connectionID) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	trace.Log(q.ctx).Infof("\x1b[32m●\x1b[m eventDone id=%#v", id)
+	if doTrace {
+		trace.Log(q.ctx).Infof("\x1b[32m●\x1b[m eventDone id=%#v", id)
+	}
 	item, ok := q.items[id]
 	if !ok {
 		trace.Log(q.ctx).Panicf("Done Request for non-existent item")
@@ -238,9 +229,6 @@ func (q *refreshClient) eventDone(id connectionID) {
 		trace.Log(q.ctx).Infof("progress: request")
 		q.progressQueue(id)
 	} else if item.repeat != nil {
-		// XXX: debug stuff: disable refresh at all
-		{ item.repeat = nil; return }
-
 		// TODO: it.rv - is that right? Check for PR
 		expireTime, err := ptypes.Timestamp(it2.rv.GetPath().GetPathSegments()[it2.rv.GetPath().GetIndex()].GetExpires())
 		if err != nil {
@@ -249,16 +237,15 @@ func (q *refreshClient) eventDone(id connectionID) {
 		}
 		// TODO: introduce random noise into duration avoid timer lock
 		duration := time.Until(expireTime) / 3
-		trace.Log(q.ctx).Infof("duration=%v", duration)
+		if doTrace {
+			trace.Log(q.ctx).Infof("duration=%v", duration)
+		}
 
-		timerID := q.timerIDCounter
-		q.timerIDCounter++
-
-		item.timerID = timerID
-		q.timerIDs[timerID] = id
-		item.timer = time.AfterFunc(duration, func() {
-			q.eventTimer(timerID)
+		var timer *time.Timer
+		timer = time.AfterFunc(duration, func() {
+			q.eventTimer(id, item, &timer)
 		})
+		item.timer = timer
 	}
 }
 
@@ -275,7 +262,7 @@ func mergeRequests(ctx context.Context, running queueItem, new_ queueItem) bool 
 	}
 
 	// TODO: compare
-	if false {
+	if true {
 		return false
 	}
 

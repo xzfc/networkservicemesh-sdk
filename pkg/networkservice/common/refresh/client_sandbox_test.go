@@ -30,7 +30,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 )
 
-func TestClient_Sandbox(t *testing.T) {
+func TestRefreshClient_Sandbox(t *testing.T) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 	logrus.SetOutput(ioutil.Discard)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
@@ -64,7 +64,7 @@ func TestClient_Sandbox(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 1)
 
 	refreshSrv.beforeRequest("1")
 	conn, err = nsc.Request(ctx, mkRequest(0, 1, conn.Clone()))

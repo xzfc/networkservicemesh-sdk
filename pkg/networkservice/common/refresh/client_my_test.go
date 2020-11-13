@@ -146,10 +146,8 @@ func TestNewClient_StopRefreshAtAnotherRequest(t *testing.T) {
 }
 
 const (
-	stressExpireTimeout = 25 * time.Millisecond
-	stressMinDuration   = stressExpireTimeout / 5
-	stressMaxDuration   = stressExpireTimeout * 3 / 2
-	stressTick          = 82 * time.Millisecond
+	stressExpireTimeout = 25 * time.Millisecond / 10
+	stressTick          = 82 * time.Millisecond / 10
 )
 
 // TestNewClient_Stress is a stress-test to reveal race-conditions when a request and a
@@ -166,22 +164,54 @@ const (
 // Description:
 //   ...
 func TestNewClient_Stress(t *testing.T) {
+	table := []stressTestConfig {
+		{
+			name:          "RaceConditions",
+			expireTimeout: 2 * time.Millisecond,
+			minDuration:   0,
+			maxDuration:   time.Hour,
+			tickDuration:  82 * time.Millisecond / 10,
+			iterations:    100,
+		},
+		{
+			name: "Durations",
+			expireTimeout: 25 * time.Millisecond,
+			minDuration:   25 * time.Millisecond / 5,
+			maxDuration:   25 * time.Millisecond * 3 / 2,
+			tickDuration:  82 * time.Millisecond,
+			iterations:    100,
+		},
+	}
+	for _, q := range table {
+		t.Run(q.name, func(t *testing.T) { runStressTest(t, &q) })
+	}
+}
+
+type stressTestConfig struct {
+	name string
+	expireTimeout time.Duration
+	minDuration, maxDuration time.Duration
+	tickDuration time.Duration
+	iterations int
+}
+
+func runStressTest(t *testing.T, conf *stressTestConfig) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 
 	randSrc := rand.New(rand.NewSource(0))
 
-	refreshTester := newRefreshTesterServer(t, stressMinDuration, stressMaxDuration)
+	refreshTester := newRefreshTesterServer(t, conf.minDuration, conf.maxDuration)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := next.NewNetworkServiceClient(
 		updatepath.NewClient("foo"),
 		refresh.NewClient(ctx),
-		updatetoken.NewClient(sandbox.GenerateExpiringToken(stressExpireTimeout)),
+		updatetoken.NewClient(sandbox.GenerateExpiringToken(conf.expireTimeout)),
 		adapters.NewServerToClient(refreshTester))
 
 	var oldConn *networkservice.Connection
-	for i := 0; i < 1000 && !t.Failed(); i++ {
+	for i := 0; i < conf.iterations && !t.Failed(); i++ {
 		if i%100 == 0 {
 			// TODO: use t.Logf?
 			fmt.Println()
@@ -202,7 +232,7 @@ func TestNewClient_Stress(t *testing.T) {
 		}
 
 		if randSrc.Int31n(10) != 0 {
-			time.Sleep(stressTick)
+			time.Sleep(conf.tickDuration)
 		}
 
 		if randSrc.Int31n(10) == 0 {
@@ -220,7 +250,7 @@ func TestNewClient_Stress(t *testing.T) {
 		_, _ = client.Close(ctx, oldConn)
 		refreshTester.afterClose()
 	}
-	time.Sleep(stressTick)
+	time.Sleep(conf.tickDuration)
 }
 
 // TODO: drop this test

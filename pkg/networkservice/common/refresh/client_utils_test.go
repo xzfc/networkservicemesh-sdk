@@ -82,20 +82,20 @@ type refreshTesterServer struct {
 	maxDuration time.Duration
 
 	mutex         sync.Mutex
-	state         refreshTesterServerState
+	state         int
 	lastSeen      time.Time
 	currentMarker string
 	nextMarker    string
 }
 
-type refreshTesterServerState string
+type refreshTesterServerState = int
 
 const (
-	testRefreshStateInit        = refreshTesterServerState("init")
-	testRefreshStateWaitRequest = refreshTesterServerState("wait-request")
-	testRefreshStateDoneRequest = refreshTesterServerState("done-request")
-	testRefreshStateRunning     = refreshTesterServerState("running")
-	testRefreshStateWaitClose   = refreshTesterServerState("wait-close")
+	testRefreshStateInit        = iota
+	testRefreshStateWaitRequest
+	testRefreshStateDoneRequest
+	testRefreshStateRunning
+	testRefreshStateWaitClose
 )
 
 func newRefreshTesterServer(t *testing.T, minDuration, maxDuration time.Duration) *refreshTesterServer {

@@ -44,7 +44,7 @@ type refreshExecutor struct {
 }
 
 func NewClient(ctx context.Context) networkservice.NetworkServiceClient {
-	return NewClient2(ctx)
+	return NewClient1(ctx)
 }
 
 func NewClient2(ctx context.Context) *refreshClient2 {
