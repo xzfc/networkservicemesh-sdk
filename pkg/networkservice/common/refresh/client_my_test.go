@@ -19,6 +19,7 @@ package refresh_test
 import (
 	"context"
 	"fmt"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -205,6 +206,7 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := next.NewNetworkServiceClient(
+		serialize.NewClient(),
 		updatepath.NewClient("foo"),
 		refresh.NewClient(ctx),
 		updatetoken.NewClient(sandbox.GenerateExpiringToken(conf.expireTimeout)),
@@ -265,7 +267,7 @@ func TestNewClient_Reuse(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := next.NewNetworkServiceClient(refresh.NewClient(ctx), testRefresh)
+	client := next.NewNetworkServiceClient(serialize.NewClient(), refresh.NewClient(ctx), testRefresh)
 
 	request := &networkservice.NetworkServiceRequest{
 		Connection: &networkservice.Connection{Id: "conn"},

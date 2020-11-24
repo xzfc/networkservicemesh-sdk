@@ -19,6 +19,7 @@ package refresh_test
 import (
 	"context"
 	"fmt"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
 	"strconv"
 	"testing"
 	"time"
@@ -49,6 +50,7 @@ func testCreateChain(ctx context.Context, start networkservice.NetworkServiceCli
 			adapters.NewClientToServer(client),
 		)
 		client = chain.NewNetworkServiceClient(
+			serialize.NewClient(),
 			updatepath.NewClient("client-"+strconv.Itoa(i)),
 			refresh.NewClient(ctx),
 			updatetoken.NewClient(testToken),

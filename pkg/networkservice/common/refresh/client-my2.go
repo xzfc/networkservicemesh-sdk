@@ -44,7 +44,7 @@ type refreshExecutor struct {
 }
 
 func NewClient(ctx context.Context) networkservice.NetworkServiceClient {
-	return NewClient1(ctx)
+	return NewClient3(ctx)
 }
 
 func NewClient2(ctx context.Context) *refreshClient2 {
@@ -138,18 +138,43 @@ func (q *refreshClient2) startTimer(connectionID string, exec *refreshExecutor, 
 }
 
 func (q *refreshClient2) execute(connectionID string, f func(*refreshExecutor)) {
-	execInt, loaded := q.items.LoadOrStore(connectionID, &refreshExecutor{refs: 1})
-	exec := execInt.(*refreshExecutor)
-	<-exec.executor.AsyncExec(func() {
-		if loaded {
-			exec.refs++
-		}
+	switch 0 {
+	case 0:
+		execInt, loaded := q.items.LoadOrStore(connectionID, &refreshExecutor{refs: 1})
+		exec := execInt.(*refreshExecutor)
+		<-exec.executor.AsyncExec(func() {
+			if loaded {
+				exec.refs++
+			}
 
-		f(exec)
+			f(exec)
 
-		exec.refs--
-		if exec.refs == 0 {
-			q.items.Delete(connectionID)
+			exec.refs--
+			if exec.refs == 0 {
+				q.items.Delete(connectionID)
+			}
+		})
+	case 1:
+		run := func(exec *refreshExecutor) {
+			f(exec)
+			exec.refs--
+			if exec.refs == 0 {
+				q.items.Delete(connectionID)
+			}
 		}
-	})
+		exec := &refreshExecutor{refs: 1}
+		<-exec.executor.AsyncExec(func() {
+			if execInt, loaded := q.items.LoadOrStore(connectionID, exec); loaded {
+				exec2 := execInt.(*refreshExecutor)
+				<-exec2.executor.AsyncExec(func() {
+					exec.refs++
+					run(exec2)
+				})
+			} else {
+				run(exec)
+			}
+		})
+	case 2:
+
+	}
 }

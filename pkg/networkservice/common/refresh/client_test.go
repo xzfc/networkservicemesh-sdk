@@ -18,6 +18,7 @@ package refresh_test
 
 import (
 	"context"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -56,6 +57,7 @@ func TestRefreshClient_StopRefreshAtClose(t *testing.T) {
 		t: t,
 	}
 	client := chain.NewNetworkServiceClient(
+		serialize.NewClient(),
 		refresh.NewClient(ctx),
 		updatepath.NewClient("refresh"),
 		updatetoken.NewClient(sandbox.GenerateExpiringToken(expireTimeout)),
@@ -90,6 +92,7 @@ func TestRefreshClient_StopRefreshAtAnotherRequest(t *testing.T) {
 		t: t,
 	}
 	client := chain.NewNetworkServiceClient(
+		serialize.NewClient(),
 		refresh.NewClient(ctx),
 		cloneClient,
 	)
@@ -153,7 +156,11 @@ func TestRefreshClient_Serial(t *testing.T) {
 			mut.Unlock()
 		},
 	}
-	client := next.NewNetworkServiceClient(refresh.NewClient(ctx), testRefresh)
+	client := next.NewNetworkServiceClient(
+		serialize.NewClient(),
+		refresh.NewClient(ctx),
+		testRefresh,
+	)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -209,7 +216,11 @@ func TestRefreshClient_Parallel(t *testing.T) {
 			mut.Unlock()
 		},
 	}
-	client := next.NewNetworkServiceClient(refresh.NewClient(ctx), testRefresh)
+	client := next.NewNetworkServiceClient(
+		serialize.NewClient(),
+		refresh.NewClient(ctx),
+		testRefresh,
+	)
 
 	for i := 0; i < 10; i++ {
 		connCh := make(chan *networkservice.Connection, 1)
