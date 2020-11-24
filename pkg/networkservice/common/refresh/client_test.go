@@ -19,15 +19,16 @@ package refresh_test
 import (
 	"context"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
+	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
@@ -35,7 +36,6 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 )
 
@@ -44,7 +44,6 @@ const (
 	eventuallyTimeout = expireTimeout
 	tickTimeout       = 10 * time.Millisecond
 	neverTimeout      = 5 * expireTimeout
-	endpointName      = "endpoint-name"
 )
 
 func TestRefreshClient_StopRefreshAtClose(t *testing.T) {
@@ -115,158 +114,85 @@ func TestRefreshClient_StopRefreshAtAnotherRequest(t *testing.T) {
 	require.Never(t, cloneClient.validator(3), neverTimeout, tickTimeout)
 }
 
-// TestRefreshClient_Serial checks that requests/closes with a same ID are
-// performed sequentially.
-func TestRefreshClient_Serial(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var mut sync.Mutex
-	var expectedOrder []string
-	var actualOrder []string
-	inUse := false
-
-	testRefresh := &testNSC{
-		RequestFunc: func(r *testNSCRequest) {
-			setExpires(r.in.GetConnection(), time.Hour)
-
-			mut.Lock()
-			assert.False(t, inUse)
-			inUse = true
-			actualOrder = append(actualOrder, "request "+r.in.Connection.Context.ExtraContext["refresh"])
-			mut.Unlock()
-
-			time.Sleep(100 * time.Millisecond)
-
-			mut.Lock()
-			inUse = false
-			mut.Unlock()
-		},
-		CloseFunc: func(r *testNSCClose) {
-			mut.Lock()
-			assert.False(t, inUse)
-			inUse = true
-			actualOrder = append(actualOrder, "close "+r.in.Context.ExtraContext["refresh"])
-			mut.Unlock()
-
-			time.Sleep(100 * time.Millisecond)
-
-			mut.Lock()
-			inUse = false
-			mut.Unlock()
-		},
-	}
-	client := next.NewNetworkServiceClient(
-		serialize.NewClient(),
-		refresh.NewClient(ctx),
-		testRefresh,
-	)
-
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(2)
-		req := mkRequest(0, i, nil)
-		go func() {
-			_, err := client.Request(context.Background(), req.Clone())
-			assert.Nil(t, err)
-			wg.Done()
-		}()
-		time.Sleep(10 * time.Millisecond)
-		go func() {
-			_, err := client.Close(context.Background(), req.Connection.Clone())
-			assert.Nil(t, err)
-			wg.Done()
-		}()
-		time.Sleep(10 * time.Millisecond)
-
-		expectedOrder = append(expectedOrder,
-			"request "+strconv.Itoa(i),
-			"close "+strconv.Itoa(i),
-		)
-	}
-	wg.Wait()
-
-	assert.Equal(t, expectedOrder, actualOrder)
+type stressTestConfig struct {
+	name string
+	expireTimeout time.Duration
+	minDuration, maxDuration time.Duration
+	tickDuration time.Duration
+	iterations int
 }
 
-// TestRefreshClient_Parallel checks that requests/closes with a distinct ID are
-// performed in parallel.
-func TestRefreshClient_Parallel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var mut sync.Mutex
-	expected := map[string]bool{}
-	actual := map[string]bool{}
-	connChs := []chan *networkservice.Connection{}
-
-	testRefresh := &testNSC{
-		RequestFunc: func(r *testNSCRequest) {
-			time.Sleep(1 * time.Second)
-
-			mut.Lock()
-			actual["request "+r.in.Connection.Id] = true
-			mut.Unlock()
+func TestRefreshClient_Stress(t *testing.T) {
+	table := []stressTestConfig {
+		{
+			name:          "RaceConditions",
+			expireTimeout: 2 * time.Millisecond,
+			minDuration:   0,
+			maxDuration:   time.Hour,
+			tickDuration:  8100 * time.Microsecond,
+			iterations:    100,
 		},
-		CloseFunc: func(r *testNSCClose) {
-			time.Sleep(1 * time.Second)
-
-			mut.Lock()
-			actual["close "+r.in.Id] = true
-			mut.Unlock()
+		{
+			name: "Durations",
+			expireTimeout: 100 * time.Millisecond,
+			minDuration:   100 * time.Millisecond / 5,
+			maxDuration:   100 * time.Millisecond,
+			tickDuration:  82 * time.Millisecond,
+			iterations:    15,
 		},
 	}
-	client := next.NewNetworkServiceClient(
-		serialize.NewClient(),
-		refresh.NewClient(ctx),
-		testRefresh,
-	)
-
-	for i := 0; i < 10; i++ {
-		connCh := make(chan *networkservice.Connection, 1)
-		connChs = append(connChs, connCh)
-		req := mkRequest(i, 0, nil)
-		go func() {
-			conn, err := client.Request(context.Background(), req)
-			assert.NotNil(t, conn)
-			assert.Nil(t, err)
-			connCh <- conn
-		}()
-		expected["request "+req.Connection.Id] = true
+	for _, q := range table {
+		t.Run(q.name, func(t *testing.T) { runStressTest(t, &q) })
 	}
-	require.Eventually(t, func() bool {
-		mut.Lock()
-		defer mut.Unlock()
-		return assert.ObjectsAreEqual(expected, actual)
-	}, 2*time.Second, tickTimeout)
-
-	for i := 0; i < 10; i++ {
-		conn := <-connChs[i]
-		go func() {
-			_, err := client.Close(context.Background(), conn)
-			assert.Nil(t, err)
-		}()
-		expected["close "+conn.Id] = true
-	}
-	require.Eventually(t, func() bool {
-		mut.Lock()
-		defer mut.Unlock()
-		return assert.ObjectsAreEqual(expected, actual)
-	}, 2*time.Second, tickTimeout)
 }
 
-func setExpires(conn *networkservice.Connection, expireTimeout time.Duration) {
-	expireTime := time.Now().Add(expireTimeout)
-	expires := &timestamp.Timestamp{
-		Seconds: expireTime.Unix(),
-		Nanos:   int32(expireTime.Nanosecond()),
+func runStressTest(t *testing.T, conf *stressTestConfig) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+	randSrc := rand.New(rand.NewSource(0))
+
+	refreshTester := newRefreshTesterServer(t, conf.minDuration, conf.maxDuration)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := next.NewNetworkServiceClient(
+		serialize.NewClient(),
+		updatepath.NewClient("foo"),
+		refresh.NewClient(ctx),
+		updatetoken.NewClient(sandbox.GenerateExpiringToken(conf.expireTimeout)),
+		adapters.NewServerToClient(refreshTester),
+	)
+
+	var oldConn *networkservice.Connection
+	for i := 0; i < conf.iterations && !t.Failed(); i++ {
+		refreshTester.beforeRequest(strconv.Itoa(i))
+		conn, err := client.Request(ctx, mkRequest(0, i, oldConn))
+		refreshTester.afterRequest()
+		assert.NotNil(t, conn)
+		assert.Nil(t, err)
+		oldConn = conn
+
+		if t.Failed() {
+			break
+		}
+
+		if randSrc.Int31n(10) != 0 {
+			time.Sleep(conf.tickDuration)
+		}
+
+		if randSrc.Int31n(10) == 0 {
+			refreshTester.beforeClose()
+			_, err = client.Close(ctx, oldConn)
+			assert.Nil(t, err)
+			refreshTester.afterClose()
+			oldConn = nil
+		}
 	}
-	conn.Path = &networkservice.Path{
-		Index: 0,
-		PathSegments: []*networkservice.PathSegment{
-			{
-				Expires: expires,
-			},
-		},
+
+	if oldConn != nil {
+		refreshTester.beforeClose()
+		_, _ = client.Close(ctx, oldConn)
+		refreshTester.afterClose()
 	}
+	time.Sleep(conf.tickDuration)
 }

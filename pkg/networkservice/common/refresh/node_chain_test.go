@@ -19,41 +19,35 @@ package refresh_test
 import (
 	"context"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
+	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 	"go.uber.org/goleak"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/credentials"
-
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
+	"github.com/stretchr/testify/require"
 )
 
-func testToken(_ credentials.AuthInfo) (tokenValue string, expireTime time.Time, err error) {
-	expireTime = time.Now().UTC().Add(time.Millisecond * 100)
-	return "TestToken", expireTime, nil
-}
-
-func testCreateChain(ctx context.Context, start networkservice.NetworkServiceClient) networkservice.NetworkServiceClient {
+func createChain(ctx context.Context, start networkservice.NetworkServiceClient) networkservice.NetworkServiceClient {
 	client := start
 	for i := 0; i < 10; i++ {
 		server := chain.NewNetworkServiceServer(
 			updatepath.NewServer("server-"+strconv.Itoa(i)),
-			updatetoken.NewServer(testToken),
+			updatetoken.NewServer(sandbox.GenerateExpiringToken(100 * time.Millisecond)),
 			adapters.NewClientToServer(client),
 		)
 		client = chain.NewNetworkServiceClient(
 			serialize.NewClient(),
 			updatepath.NewClient("client-"+strconv.Itoa(i)),
 			refresh.NewClient(ctx),
-			updatetoken.NewClient(testToken),
+			updatetoken.NewClient(sandbox.GenerateExpiringToken(100 * time.Millisecond)),
 			adapters.NewServerToClient(server),
 		)
 		_ = refresh.NewClient
@@ -68,7 +62,7 @@ func TestRefreshClient_Chain(t *testing.T) {
 	defer cancel()
 
 	initClient := null.NewClient()
-	client := testCreateChain(ctx, initClient)
+	client := createChain(ctx, initClient)
 
 	request := mkRequest(0, 0, nil)
 	rv, err := client.Request(ctx, request.Clone())

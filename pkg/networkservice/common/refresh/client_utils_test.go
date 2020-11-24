@@ -18,6 +18,9 @@ package refresh_test
 
 import (
 	"context"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/cls"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -31,6 +34,8 @@ import (
 
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
+
+const endpointName = "endpoint-name"
 
 type countClient struct {
 	t     *testing.T
@@ -183,4 +188,26 @@ func (t *refreshTesterServer) Close(ctx context.Context, connection *networkserv
 	// TODO: check for closes
 
 	return &empty.Empty{}, nil
+}
+
+func mkRequest(id, marker int, conn *networkservice.Connection) *networkservice.NetworkServiceRequest {
+	if conn == nil {
+		conn = &networkservice.Connection{
+			Id: "conn-" + strconv.Itoa(id),
+			Context: &networkservice.ConnectionContext{
+				ExtraContext: map[string]string{
+					"refresh": strconv.Itoa(marker),
+				},
+			},
+			NetworkService: "my-service-remote",
+		}
+	} else {
+		conn.Context.ExtraContext["refresh"] = strconv.Itoa(marker)
+	}
+	return &networkservice.NetworkServiceRequest{
+		MechanismPreferences: []*networkservice.Mechanism{
+			{Cls: cls.LOCAL, Type: kernel.MECHANISM},
+		},
+		Connection: conn,
+	}
 }
