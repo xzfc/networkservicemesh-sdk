@@ -146,24 +146,7 @@ func TestNewClient_StopRefreshAtAnotherRequest(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-const (
-	stressExpireTimeout = 25 * time.Millisecond / 10
-	stressTick          = 82 * time.Millisecond / 10
-)
-
 // TestNewClient_Stress is a stress-test to reveal race-conditions when a request and a
-//
-// Time graph:
-//      time ->
-//   C: 0              1              2              ... 99
-//   R:  0  0  0  0  0  1  1  1  1  1  2  2  2  2  2 ...  99 99 99 99 99
-//
-// Legend:
-//   C - client requests
-//   R - requests sent by refreshClient
-//
-// Description:
-//   ...
 func TestNewClient_Stress(t *testing.T) {
 	table := []stressTestConfig {
 		{
@@ -176,11 +159,11 @@ func TestNewClient_Stress(t *testing.T) {
 		},
 		{
 			name: "Durations",
-			expireTimeout: 25 * time.Millisecond,
-			minDuration:   25 * time.Millisecond / 5,
-			maxDuration:   25 * time.Millisecond * 3 / 2,
+			expireTimeout: 100 * time.Millisecond,
+			minDuration:   100 * time.Millisecond / 5,
+			maxDuration:   100 * time.Millisecond,
 			tickDuration:  82 * time.Millisecond,
-			iterations:    100,
+			iterations:    15,
 		},
 	}
 	for _, q := range table {

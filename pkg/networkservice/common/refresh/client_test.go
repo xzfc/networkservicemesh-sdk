@@ -270,8 +270,3 @@ func setExpires(conn *networkservice.Connection, expireTimeout time.Duration) {
 		},
 	}
 }
-
-// TODO: test connection cancel?
-// TODO: test everything cancel?
-// TODO: test connection updating by NSE
-// TODO: test chain: ensure that refresh do not updates connection ids

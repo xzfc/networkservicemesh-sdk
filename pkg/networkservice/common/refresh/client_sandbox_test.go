@@ -36,7 +36,7 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 	defer cancel()
 
-	tokenGenerator := sandbox.GenerateExpiringToken(time.Millisecond * 500)
+	tokenGenerator := sandbox.GenerateExpiringToken(time.Second * 5)
 
 	domain := sandbox.NewBuilder(t).
 		SetNodesCount(2).
@@ -51,7 +51,7 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 		NetworkServiceNames: []string{"my-service-remote"},
 	}
 
-	refreshSrv := newRefreshTesterServer(t, time.Millisecond*100, time.Millisecond*500)
+	refreshSrv := newRefreshTesterServer(t, time.Second*1, time.Second*5)
 	_, err := sandbox.NewEndpoint(ctx, nseReg, tokenGenerator, domain.Nodes[0].NSMgr, refreshSrv)
 	require.NoError(t, err)
 
@@ -64,7 +64,7 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
 
 	refreshSrv.beforeRequest("1")
 	conn, err = nsc.Request(ctx, mkRequest(0, 1, conn.Clone()))
@@ -72,11 +72,11 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
 
 	refreshSrv.beforeClose()
 	_, err = nsc.Close(ctx, conn.Clone())
 	refreshSrv.afterClose()
 	require.NoError(t, err)
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Second * 5)
 }
