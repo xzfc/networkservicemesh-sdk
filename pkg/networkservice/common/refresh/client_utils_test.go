@@ -165,6 +165,9 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 	marker := request.Connection.Context.ExtraContext[connectionMarker]
 	require.NotEmpty(t.t, marker, "Marker is empty")
 
+	delta := time.Now().UTC().Sub(t.lastSeen)
+	fmt.Printf("delta=%v min=%v marker=%v\n", delta, t.minDuration, marker)
+
 	switch t.state {
 	case testRefreshStateWaitRequest:
 		require.Contains(t.t, []string{t.nextMarker, t.currentMarker}, marker, "Unexpected marker")
@@ -174,8 +177,7 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 		}
 	case testRefreshStateDoneRequest, testRefreshStateRunning, testRefreshStateWaitClose:
 		require.Equal(t.t, t.currentMarker, marker, "Unexpected marker")
-		delta := time.Now().UTC().Sub(t.lastSeen)
-		fmt.Printf("delta=%v min=%v\n", delta, t.minDuration)
+		// delta := time.Now().UTC().Sub(t.lastSeen)
 		// require.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
 	default:
 		require.Fail(t.t, "Unexpected state", t.state)
