@@ -122,7 +122,6 @@ func (t *refreshTesterServer) afterRequest() {
 	t.checkUnlocked()
 	require.Equal(t.t, testRefreshStateDoneRequest, t.state, "Unexpected state")
 	t.state = testRefreshStateRunning
-	t.currentMarker = t.nextMarker
 }
 
 func (t *refreshTesterServer) beforeClose() {
@@ -162,6 +161,7 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 		require.Contains(t.t, []string{t.nextMarker, t.currentMarker}, marker, "Unexpected marker")
 		if marker == t.nextMarker {
 			t.state = testRefreshStateDoneRequest
+			t.currentMarker = t.nextMarker
 		}
 	case testRefreshStateDoneRequest, testRefreshStateRunning, testRefreshStateWaitClose:
 		require.Equal(t.t, t.currentMarker, marker, "Unexpected marker")

@@ -20,9 +20,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
+	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 	"math/rand"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -35,11 +38,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
-	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 )
 
 const (
@@ -146,7 +145,6 @@ func TestNewClient_StopRefreshAtAnotherRequest(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-// TestNewClient_Stress is a stress-test to reveal race-conditions when a request and a
 func TestNewClient_Stress(t *testing.T) {
 	table := []stressTestConfig {
 		{
@@ -154,8 +152,8 @@ func TestNewClient_Stress(t *testing.T) {
 			expireTimeout: 2 * time.Millisecond,
 			minDuration:   0,
 			maxDuration:   time.Hour,
-			tickDuration:  82 * time.Millisecond / 10,
-			iterations:    100,
+			tickDuration:  82 * time.Millisecond / 100,
+			iterations:    30000,
 		},
 		{
 			name: "Durations",
@@ -191,9 +189,10 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 	client := next.NewNetworkServiceClient(
 		serialize.NewClient(),
 		updatepath.NewClient("foo"),
-		refresh.NewClient(ctx),
+		refresh.NewClient3(ctx),
 		updatetoken.NewClient(sandbox.GenerateExpiringToken(conf.expireTimeout)),
-		adapters.NewServerToClient(refreshTester))
+		adapters.NewServerToClient(refreshTester),
+		)
 
 	var oldConn *networkservice.Connection
 	for i := 0; i < conf.iterations && !t.Failed(); i++ {
@@ -238,45 +237,3 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 	time.Sleep(conf.tickDuration)
 }
 
-// TODO: drop this test
-func TestNewClient_Reuse(t *testing.T) {
-	testRefresh := &testNSC{
-		RequestFunc: func(r *testNSCRequest) {
-			setExpires(r.in.GetConnection(), 10000*time.Millisecond)
-			time.Sleep(500 * time.Millisecond)
-			fmt.Println("!!!")
-		},
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	client := next.NewNetworkServiceClient(serialize.NewClient(), refresh.NewClient(ctx), testRefresh)
-
-	request := &networkservice.NetworkServiceRequest{
-		Connection: &networkservice.Connection{Id: "conn"},
-	}
-
-	var conn1, conn2 *networkservice.Connection
-	var err1, err2 error
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		conn1, err1 = client.Request(
-			withRequestNumber(context.Background(), 1),
-			request.Clone())
-		wg.Done()
-	}()
-	time.Sleep(25 * time.Millisecond)
-	go func() {
-		conn2, err2 = client.Request(
-			withRequestNumber(context.Background(), 1),
-			request.Clone())
-		wg.Done()
-	}()
-	wg.Wait()
-
-	assert.Nil(t, err1)
-	assert.Nil(t, err2)
-	fmt.Println(conn1, conn2)
-	// TODO: check that conn1 and conn2 are the same
-}

@@ -98,16 +98,18 @@ func (q *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 	timer = time.AfterFunc(duration, func() {
 		exec.AsyncExec(func() error {
 			oldTimer, _ := q.timers.LoadAndDelete(connectionID)
-			if oldTimer == nil || oldTimer.(*time.Timer) != timer {
+			if oldTimer == nil {
+				return nil
+			}
+			if oldTimer.(*time.Timer) != timer {
+				oldTimer.(*time.Timer).Stop()
 				return nil
 			}
 
-			/* TODO:
 			if q.ctx.Err() != nil {
 				// Context is canceled or deadlined.
-				return
+				return nil
 			}
-			*/
 
 			rv, err := nextClient.Request(q.ctx, request.Clone(), opts...)
 

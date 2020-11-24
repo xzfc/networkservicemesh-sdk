@@ -18,8 +18,8 @@ package refresh_test
 
 import (
 	"context"
-	"fmt"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
+	"go.uber.org/goleak"
 	"strconv"
 	"testing"
 	"time"
@@ -61,7 +61,9 @@ func testCreateChain(ctx context.Context, start networkservice.NetworkServiceCli
 	return client
 }
 
-func TestNope(t *testing.T) {
+func TestRefreshClient_Chain(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -71,12 +73,12 @@ func TestNope(t *testing.T) {
 	request := mkRequest(0, 0, nil)
 	rv, err := client.Request(ctx, request.Clone())
 	require.Nil(t, err)
-	fmt.Println(rv)
+	require.NotNil(t, rv)
 
 	// request.Connection = rv
 	// rv, err = client.Request(ctx, request.Clone())
 	// require.Nil(t, err)
 	// fmt.Println(rv)
 
-	time.Sleep(time.Second * 10)
+	time.Sleep(time.Second * 1)
 }
