@@ -59,7 +59,7 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 	require.NoError(t, err)
 
 	refreshSrv.beforeRequest("0")
-	conn, err := nsc.Request(ctx, mkRequest(0, 0, nil))
+	conn, err := nsc.Request(ctx, mkRequest(0, nil))
 	refreshSrv.afterRequest()
 	require.NoError(t, err)
 	require.NotNil(t, conn)
@@ -67,7 +67,7 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 	time.Sleep(time.Second * 5)
 
 	refreshSrv.beforeRequest("1")
-	conn, err = nsc.Request(ctx, mkRequest(0, 1, conn.Clone()))
+	conn, err = nsc.Request(ctx, mkRequest(1, conn.Clone()))
 	refreshSrv.afterRequest()
 	require.NoError(t, err)
 	require.NotNil(t, conn)

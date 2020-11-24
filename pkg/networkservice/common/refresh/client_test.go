@@ -166,7 +166,7 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 	var oldConn *networkservice.Connection
 	for i := 0; i < conf.iterations && !t.Failed(); i++ {
 		refreshTester.beforeRequest(strconv.Itoa(i))
-		conn, err := client.Request(ctx, mkRequest(0, i, oldConn))
+		conn, err := client.Request(ctx, mkRequest(i, oldConn))
 		refreshTester.afterRequest()
 		assert.NotNil(t, conn)
 		assert.Nil(t, err)

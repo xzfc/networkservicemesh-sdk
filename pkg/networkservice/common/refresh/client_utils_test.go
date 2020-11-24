@@ -35,7 +35,10 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
-const endpointName = "endpoint-name"
+const (
+	endpointName     = "endpoint-name"
+	connectionMarker = "refresh-marker"
+)
 
 type countClient struct {
 	t     *testing.T
@@ -80,7 +83,7 @@ func (c *countClient) Close(ctx context.Context, conn *networkservice.Connection
 //   calls. Same for Close() and beforeClose()/afterClose().
 // * Caveat: parallel client initiated requests aren't supported by this tester.
 // * To distinguish between different requests, the value of
-//   `Connection.Context.ExtraContext["refresh"]` is used as a marker.
+//   `Connection.Context.ExtraContext[connectionMarker]` is used as a marker.
 type refreshTesterServer struct {
 	t           *testing.T
 	minDuration time.Duration
@@ -158,7 +161,7 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 	defer t.mutex.Unlock()
 	t.checkUnlocked()
 
-	marker := request.Connection.Context.ExtraContext["refresh"]
+	marker := request.Connection.Context.ExtraContext[connectionMarker]
 	require.NotEmpty(t.t, marker, "Marker is empty")
 
 	switch t.state {
@@ -190,19 +193,19 @@ func (t *refreshTesterServer) Close(ctx context.Context, connection *networkserv
 	return &empty.Empty{}, nil
 }
 
-func mkRequest(id, marker int, conn *networkservice.Connection) *networkservice.NetworkServiceRequest {
+func mkRequest(marker int, conn *networkservice.Connection) *networkservice.NetworkServiceRequest {
 	if conn == nil {
 		conn = &networkservice.Connection{
-			Id: "conn-" + strconv.Itoa(id),
+			Id: "conn-id",
 			Context: &networkservice.ConnectionContext{
 				ExtraContext: map[string]string{
-					"refresh": strconv.Itoa(marker),
+					connectionMarker: strconv.Itoa(marker),
 				},
 			},
 			NetworkService: "my-service-remote",
 		}
 	} else {
-		conn.Context.ExtraContext["refresh"] = strconv.Itoa(marker)
+		conn.Context.ExtraContext[connectionMarker] = strconv.Itoa(marker)
 	}
 	return &networkservice.NetworkServiceRequest{
 		MechanismPreferences: []*networkservice.Mechanism{

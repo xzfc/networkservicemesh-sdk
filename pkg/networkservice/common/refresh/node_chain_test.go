@@ -64,7 +64,7 @@ func TestRefreshClient_Chain(t *testing.T) {
 	initClient := null.NewClient()
 	client := createChain(ctx, initClient)
 
-	request := mkRequest(0, 0, nil)
+	request := mkRequest(0, nil)
 	rv, err := client.Request(ctx, request.Clone())
 	require.Nil(t, err)
 	require.NotNil(t, rv)
