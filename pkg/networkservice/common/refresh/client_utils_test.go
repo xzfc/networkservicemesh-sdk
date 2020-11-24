@@ -166,7 +166,7 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 	require.NotEmpty(t.t, marker, "Marker is empty")
 
 	delta := time.Now().UTC().Sub(t.lastSeen)
-	fmt.Printf("delta=%v min=%v marker=%v\n", delta, t.minDuration, marker)
+	fmt.Printf("delta=%v min=%v marker=%v state=%v\n", delta, t.minDuration, marker, t.state)
 
 	switch t.state {
 	case testRefreshStateWaitRequest:

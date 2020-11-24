@@ -74,6 +74,14 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 
 	time.Sleep(time.Second * 5)
 
+	refreshSrv.beforeRequest("2")
+	conn, err = nsc.Request(ctx, mkRequest(2, conn.Clone()))
+	refreshSrv.afterRequest()
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+
+	time.Sleep(time.Second * 5)
+
 	refreshSrv.beforeClose()
 	_, err = nsc.Close(ctx, conn.Clone())
 	refreshSrv.afterClose()
