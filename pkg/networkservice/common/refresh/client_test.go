@@ -48,10 +48,11 @@ const (
 
 	maxDuration       = 100 * time.Hour
 
-	chainExpireTimeout = 100 * time.Millisecond
+	chainExpireTimeout = 500 * time.Millisecond
+	chainMaxDuration   = 500 * time.Millisecond
 	chainLength        = 10
 	chainRequests      = 5
-	chainStepDuration  = 123 * time.Millisecond
+	chainStepDuration  = 1000 * time.Millisecond
 
 	sandboxExpireTimeout = time.Second * 1
 	sandboxStepDuration  = time.Second * 2
@@ -141,7 +142,7 @@ func TestRefreshClient_Stress(t *testing.T) {
 			name:          "RaceConditions",
 			expireTimeout: 2 * time.Millisecond,
 			minDuration:   0,
-			maxDuration:   time.Hour,
+			maxDuration:   maxDuration,
 			tickDuration:  8100 * time.Microsecond,
 			iterations:    100,
 		},
@@ -182,7 +183,7 @@ func TestRefreshClient_Chain(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	refreshTester := newRefreshTesterServer(t, 0, 1 * time.Hour)
+	refreshTester := newRefreshTesterServer(t, 0, chainMaxDuration)
 	client := adapters.NewServerToClient(refreshTester)
 	for i := 0; i < chainLength; i++ {
 		server := chain.NewNetworkServiceServer(
