@@ -23,7 +23,6 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -206,7 +205,8 @@ func TestRefreshClient_Chain(t *testing.T) {
 
 func TestRefreshClient_Sandbox(t *testing.T) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-	logrus.SetOutput(ioutil.Discard)
+	logrus.SetLevel(logrus.TraceLevel)
+	// logrus.SetOutput(ioutil.Discard)
 	ctx, cancel := context.WithTimeout(context.Background(), sandboxTotalTimeout)
 	defer cancel()
 

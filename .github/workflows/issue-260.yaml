@@ -3,6 +3,7 @@ name: ci-issue-260-refresh
 on: push
 jobs:
   test:
+    if: false
     name: test
     runs-on: ubuntu-latest
     steps:
@@ -18,6 +19,7 @@ jobs:
           mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=10
   test-win:
+    if: false
     name: test-win
     runs-on: windows-latest
     steps:
@@ -46,4 +48,4 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=10
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=10 -run '^TestRefreshClient_Sandbox$'
