@@ -18,9 +18,10 @@ package refresh_test
 
 import (
 	"context"
-	"fmt"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/cls"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
+	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -105,6 +106,7 @@ const (
 	testRefreshStateDoneRequest
 	testRefreshStateRunning
 	testRefreshStateWaitClose
+	testRefreshStateDoneClose
 )
 
 func newRefreshTesterServer(t *testing.T, minDuration, maxDuration time.Duration) *refreshTesterServer {
@@ -145,7 +147,7 @@ func (t *refreshTesterServer) afterClose() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.checkUnlocked()
-	require.Equal(t.t, testRefreshStateWaitClose, t.state, "Unexpected state")
+	require.Equal(t.t, testRefreshStateDoneClose, t.state, "Unexpected state")
 	t.state = testRefreshStateInit
 	t.currentMarker = ""
 }
@@ -157,16 +159,18 @@ func (t *refreshTesterServer) checkUnlocked() {
 	}
 }
 
-func (t *refreshTesterServer) Request(_ context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
+func (t *refreshTesterServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
 	t.mutex.Lock()
-	defer t.mutex.Unlock()
+	locked := true
+	defer func() {
+		if locked {
+			t.mutex.Unlock()
+		}
+	}()
 	t.checkUnlocked()
 
 	marker := request.Connection.Context.ExtraContext[connectionMarker]
 	require.NotEmpty(t.t, marker, "Marker is empty")
-
-	delta := time.Now().UTC().Sub(t.lastSeen)
-	fmt.Printf("delta=%v min=%v marker=%v state=%v\n", delta, t.minDuration, marker, t.state)
 
 	switch t.state {
 	case testRefreshStateWaitRequest:
@@ -177,39 +181,53 @@ func (t *refreshTesterServer) Request(_ context.Context, request *networkservice
 		}
 	case testRefreshStateDoneRequest, testRefreshStateRunning, testRefreshStateWaitClose:
 		require.Equal(t.t, t.currentMarker, marker, "Unexpected marker")
-		// delta := time.Now().UTC().Sub(t.lastSeen)
-		// require.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
+		delta := time.Now().UTC().Sub(t.lastSeen)
+		require.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
 	default:
 		require.Fail(t.t, "Unexpected state", t.state)
 	}
 
 	t.lastSeen = time.Now()
-	return request.Connection, nil
+
+	t.mutex.Unlock()
+	locked = false
+
+	return next.Server(ctx).Request(ctx, request)
 }
 
 func (t *refreshTesterServer) Close(ctx context.Context, connection *networkservice.Connection) (*empty.Empty, error) {
 	t.mutex.Lock()
-	defer t.mutex.Unlock()
+	locked := true
+	defer func() {
+		if locked {
+			t.mutex.Unlock()
+			locked = false
+		}
+	}()
 	t.checkUnlocked()
 
-	// TODO: check for closes
+	require.Equal(t.t, t.state, testRefreshStateWaitClose, "Unexpected state")
+	t.state = testRefreshStateDoneClose
 
-	return &empty.Empty{}, nil
+	t.mutex.Unlock()
+	locked = false
+
+	return next.Server(ctx).Close(ctx, connection)
 }
 
-func mkRequest(marker int, conn *networkservice.Connection) *networkservice.NetworkServiceRequest {
+func mkRequest(marker string, conn *networkservice.Connection) *networkservice.NetworkServiceRequest {
 	if conn == nil {
 		conn = &networkservice.Connection{
 			Id: "conn-id",
 			Context: &networkservice.ConnectionContext{
 				ExtraContext: map[string]string{
-					connectionMarker: strconv.Itoa(marker),
+					connectionMarker: marker,
 				},
 			},
 			NetworkService: "my-service-remote",
 		}
 	} else {
-		conn.Context.ExtraContext[connectionMarker] = strconv.Itoa(marker)
+		conn.Context.ExtraContext[connectionMarker] = marker
 	}
 	return &networkservice.NetworkServiceRequest{
 		MechanismPreferences: []*networkservice.Mechanism{
@@ -217,4 +235,44 @@ func mkRequest(marker int, conn *networkservice.Connection) *networkservice.Netw
 		},
 		Connection: conn,
 	}
+}
+
+func generateRequests(t *testing.T, client networkservice.NetworkServiceClient, refreshTester *refreshTesterServer, iterations int, tickDuration time.Duration) {
+	randSrc := rand.New(rand.NewSource(0))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var oldConn *networkservice.Connection
+	for i := 0; i < iterations && !t.Failed(); i++ {
+		refreshTester.beforeRequest(strconv.Itoa(i))
+		conn, err := client.Request(ctx, mkRequest(strconv.Itoa(i), oldConn))
+		refreshTester.afterRequest()
+		assert.NotNil(t, conn)
+		assert.Nil(t, err)
+		oldConn = conn
+
+		if t.Failed() {
+			break
+		}
+
+		if randSrc.Int31n(10) != 0 {
+			time.Sleep(tickDuration)
+		}
+
+		if randSrc.Int31n(10) == 0 {
+			refreshTester.beforeClose()
+			_, err = client.Close(ctx, oldConn)
+			assert.Nil(t, err)
+			refreshTester.afterClose()
+			oldConn = nil
+		}
+	}
+
+	if oldConn != nil {
+		refreshTester.beforeClose()
+		_, _ = client.Close(ctx, oldConn)
+		refreshTester.afterClose()
+	}
+	time.Sleep(tickDuration)
 }

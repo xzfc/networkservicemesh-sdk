@@ -18,11 +18,12 @@ package refresh_test
 
 import (
 	"context"
+	"github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
-	"github.com/stretchr/testify/assert"
-	"math/rand"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -44,6 +45,11 @@ const (
 	eventuallyTimeout = expireTimeout
 	tickTimeout       = 10 * time.Millisecond
 	neverTimeout      = 5 * expireTimeout
+
+	sandboxExpireTimeout = time.Second * 1
+	sandboxStepDuration  = time.Second * 2
+	sandboxRequests      = 4
+	sandboxTotalTimeout  = time.Second * 15
 )
 
 func TestRefreshClient_StopRefreshAtClose(t *testing.T) {
@@ -137,7 +143,7 @@ func TestRefreshClient_Stress(t *testing.T) {
 			expireTimeout: 100 * time.Millisecond,
 			minDuration:   100 * time.Millisecond / 5,
 			maxDuration:   100 * time.Millisecond,
-			tickDuration:  82 * time.Millisecond,
+			tickDuration:  81 * time.Millisecond,
 			iterations:    15,
 		},
 	}
@@ -148,8 +154,6 @@ func TestRefreshClient_Stress(t *testing.T) {
 
 func runStressTest(t *testing.T, conf *stressTestConfig) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-
-	randSrc := rand.New(rand.NewSource(0))
 
 	refreshTester := newRefreshTesterServer(t, conf.minDuration, conf.maxDuration)
 
@@ -163,36 +167,62 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 		adapters.NewServerToClient(refreshTester),
 	)
 
-	var oldConn *networkservice.Connection
-	for i := 0; i < conf.iterations && !t.Failed(); i++ {
-		refreshTester.beforeRequest(strconv.Itoa(i))
-		conn, err := client.Request(ctx, mkRequest(i, oldConn))
-		refreshTester.afterRequest()
-		assert.NotNil(t, conn)
-		assert.Nil(t, err)
-		oldConn = conn
+	generateRequests(t, client, refreshTester, conf.iterations, conf.tickDuration)
+}
 
-		if t.Failed() {
-			break
-		}
+func TestRefreshClient_Chain(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		if randSrc.Int31n(10) != 0 {
-			time.Sleep(conf.tickDuration)
-		}
-
-		if randSrc.Int31n(10) == 0 {
-			refreshTester.beforeClose()
-			_, err = client.Close(ctx, oldConn)
-			assert.Nil(t, err)
-			refreshTester.afterClose()
-			oldConn = nil
-		}
+	refreshTester := newRefreshTesterServer(t, 0, 1 * time.Hour)
+	client := adapters.NewServerToClient(refreshTester)
+	for i := 0; i < 10; i++ {
+		server := chain.NewNetworkServiceServer(
+			updatepath.NewServer("server-"+strconv.Itoa(i)),
+			updatetoken.NewServer(sandbox.GenerateExpiringToken(100 * time.Millisecond)),
+			adapters.NewClientToServer(client),
+		)
+		client = chain.NewNetworkServiceClient(
+			serialize.NewClient(),
+			updatepath.NewClient("client-"+strconv.Itoa(i)),
+			refresh.NewClient(ctx),
+			updatetoken.NewClient(sandbox.GenerateExpiringToken(100 * time.Millisecond)),
+			adapters.NewServerToClient(server),
+		)
+		_ = refresh.NewClient
 	}
 
-	if oldConn != nil {
-		refreshTester.beforeClose()
-		_, _ = client.Close(ctx, oldConn)
-		refreshTester.afterClose()
+	generateRequests(t, client, refreshTester, 5, 100 * time.Millisecond)
+}
+
+func TestRefreshClient_Sandbox(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	logrus.SetOutput(ioutil.Discard)
+	ctx, cancel := context.WithTimeout(context.Background(), sandboxTotalTimeout)
+	defer cancel()
+
+	tokenGenerator := sandbox.GenerateExpiringToken(sandboxExpireTimeout)
+
+	domain := sandbox.NewBuilder(t).
+		SetNodesCount(2).
+		SetContext(ctx).
+		SetRegistryProxySupplier(nil).
+		SetTokenGenerateFunc(tokenGenerator).
+		Build()
+	defer domain.Cleanup()
+
+	nseReg := &registry.NetworkServiceEndpoint{
+		Name:                "final-endpoint",
+		NetworkServiceNames: []string{"my-service-remote"},
 	}
-	time.Sleep(conf.tickDuration)
+
+	refreshSrv := newRefreshTesterServer(t, 0, sandboxExpireTimeout)
+	_, err := sandbox.NewEndpoint(ctx, nseReg, tokenGenerator, domain.Nodes[0].NSMgr, refreshSrv)
+	require.NoError(t, err)
+
+	nsc, err := sandbox.NewClient(ctx, tokenGenerator, domain.Nodes[1].NSMgr.URL)
+	require.NoError(t, err)
+
+	generateRequests(t, nsc, refreshSrv, sandboxRequests, sandboxStepDuration)
 }
