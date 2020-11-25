@@ -41,10 +41,17 @@ import (
 )
 
 const (
-	expireTimeout     = 100 * time.Millisecond
+	expireTimeout     = 500 * time.Millisecond
 	eventuallyTimeout = expireTimeout
-	tickTimeout       = 10 * time.Millisecond
+	tickTimeout       = 50 * time.Millisecond
 	neverTimeout      = 5 * expireTimeout
+
+	maxDuration       = 100 * time.Hour
+
+	chainExpireTimeout = 100 * time.Millisecond
+	chainLength        = 10
+	chainRequests      = 5
+	chainStepDuration  = 123 * time.Millisecond
 
 	sandboxExpireTimeout = time.Second * 1
 	sandboxStepDuration  = time.Second * 2
@@ -140,10 +147,10 @@ func TestRefreshClient_Stress(t *testing.T) {
 		},
 		{
 			name: "Durations",
-			expireTimeout: 100 * time.Millisecond,
-			minDuration:   100 * time.Millisecond / 5,
-			maxDuration:   100 * time.Millisecond,
-			tickDuration:  81 * time.Millisecond,
+			expireTimeout: 500 * time.Millisecond,
+			minDuration:   500 * time.Millisecond / 5,
+			maxDuration:   500 * time.Millisecond,
+			tickDuration:  409 * time.Millisecond,
 			iterations:    15,
 		},
 	}
@@ -177,23 +184,23 @@ func TestRefreshClient_Chain(t *testing.T) {
 
 	refreshTester := newRefreshTesterServer(t, 0, 1 * time.Hour)
 	client := adapters.NewServerToClient(refreshTester)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < chainLength; i++ {
 		server := chain.NewNetworkServiceServer(
 			updatepath.NewServer("server-"+strconv.Itoa(i)),
-			updatetoken.NewServer(sandbox.GenerateExpiringToken(100 * time.Millisecond)),
+			updatetoken.NewServer(sandbox.GenerateExpiringToken(chainExpireTimeout)),
 			adapters.NewClientToServer(client),
 		)
 		client = chain.NewNetworkServiceClient(
 			serialize.NewClient(),
 			updatepath.NewClient("client-"+strconv.Itoa(i)),
 			refresh.NewClient(ctx),
-			updatetoken.NewClient(sandbox.GenerateExpiringToken(100 * time.Millisecond)),
+			updatetoken.NewClient(sandbox.GenerateExpiringToken(chainExpireTimeout)),
 			adapters.NewServerToClient(server),
 		)
 		_ = refresh.NewClient
 	}
 
-	generateRequests(t, client, refreshTester, 5, 100 * time.Millisecond)
+	generateRequests(t, client, refreshTester, chainRequests, chainStepDuration)
 }
 
 func TestRefreshClient_Sandbox(t *testing.T) {
