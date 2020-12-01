@@ -18,9 +18,6 @@ package refresh_test
 
 import (
 	"context"
-	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/cls"
-	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -30,7 +27,10 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/cls"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -101,7 +101,7 @@ type refreshTesterServer struct {
 type refreshTesterServerState = int
 
 const (
-	testRefreshStateInit        = iota
+	testRefreshStateInit = iota
 	testRefreshStateWaitRequest
 	testRefreshStateDoneRequest
 	testRefreshStateRunning

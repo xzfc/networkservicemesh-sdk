@@ -18,9 +18,6 @@ package refresh_test
 
 import (
 	"context"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -30,9 +27,12 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatepath"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/updatetoken"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/adapters"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"github.com/networkservicemesh/sdk/pkg/tools/sandbox"
 )
 
@@ -79,15 +79,15 @@ func TestRefreshClient_StopRefreshAtClose(t *testing.T) {
 }
 
 type stressTestConfig struct {
-	name string
-	expireTimeout time.Duration
+	name                     string
+	expireTimeout            time.Duration
 	minDuration, maxDuration time.Duration
-	tickDuration time.Duration
-	iterations int
+	tickDuration             time.Duration
+	iterations               int
 }
 
 func TestRefreshClient_Stress(t *testing.T) {
-	table := []stressTestConfig {
+	table := []stressTestConfig{
 		{
 			name:          "RaceConditions",
 			expireTimeout: 2 * time.Millisecond,
@@ -97,7 +97,7 @@ func TestRefreshClient_Stress(t *testing.T) {
 			iterations:    100,
 		},
 		{
-			name: "Durations",
+			name:          "Durations",
 			expireTimeout: 500 * time.Millisecond,
 			minDuration:   100 * time.Millisecond,
 			maxDuration:   500 * time.Millisecond,

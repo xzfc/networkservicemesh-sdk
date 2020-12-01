@@ -20,16 +20,16 @@ package refresh
 
 import (
 	"context"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
-	"github.com/pkg/errors"
 	"sync"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
