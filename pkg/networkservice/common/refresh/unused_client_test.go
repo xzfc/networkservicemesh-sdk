@@ -16,6 +16,19 @@ import (
 	"time"
 )
 
+const (
+	chainExpireTimeout = 500 * time.Millisecond
+	chainMaxDuration   = 500 * time.Millisecond
+	chainLength        = 10
+	chainRequests      = 5
+	chainStepDuration  = 1000 * time.Millisecond
+
+	sandboxExpireTimeout = time.Second * 1
+	sandboxStepDuration  = time.Second * 2
+	sandboxRequests      = 4
+	sandboxTotalTimeout  = time.Second * 15
+)
+
 const requestNumber contextKeyType = "RequestNumber"
 type contextKeyType string
 
@@ -293,4 +306,113 @@ func mkRequest(id, marker int, conn *networkservice.Connection) *networkservice.
 		},
 		Connection: conn,
 	}
+}
+
+
+////
+type stressTestConfig struct {
+	name string
+	expireTimeout time.Duration
+	minDuration, maxDuration time.Duration
+	tickDuration time.Duration
+	iterations int
+}
+
+func TestRefreshClient_Stress(t *testing.T) {
+	table := []stressTestConfig {
+		{
+			name:          "RaceConditions",
+			expireTimeout: 2 * time.Millisecond,
+			minDuration:   0,
+			maxDuration:   maxDuration,
+			tickDuration:  8100 * time.Microsecond,
+			iterations:    100,
+		},
+		{
+			name: "Durations",
+			expireTimeout: 500 * time.Millisecond,
+			minDuration:   500 * time.Millisecond / 5,
+			maxDuration:   500 * time.Millisecond,
+			tickDuration:  409 * time.Millisecond,
+			iterations:    15,
+		},
+	}
+	for _, q := range table {
+		t.Run(q.name, func(t *testing.T) { runStressTest(t, &q) })
+	}
+}
+
+func runStressTest(t *testing.T, conf *stressTestConfig) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+	refreshTester := newRefreshTesterServer(t, conf.minDuration, conf.maxDuration)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := next.NewNetworkServiceClient(
+		serialize.NewClient(),
+		updatepath.NewClient("foo"),
+		refresh.NewClient(ctx),
+		updatetoken.NewClient(sandbox.GenerateExpiringToken(conf.expireTimeout)),
+		adapters.NewServerToClient(refreshTester),
+	)
+
+	generateRequests(t, client, refreshTester, conf.iterations, conf.tickDuration)
+}
+
+func TestRefreshClient_Chain(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	refreshTester := newRefreshTesterServer(t, 0, chainMaxDuration)
+	client := adapters.NewServerToClient(refreshTester)
+	for i := 0; i < chainLength; i++ {
+		server := chain.NewNetworkServiceServer(
+			updatepath.NewServer("server-"+strconv.Itoa(i)),
+			updatetoken.NewServer(sandbox.GenerateExpiringToken(chainExpireTimeout)),
+			adapters.NewClientToServer(client),
+		)
+		client = chain.NewNetworkServiceClient(
+			serialize.NewClient(),
+			updatepath.NewClient("client-"+strconv.Itoa(i)),
+			refresh.NewClient(ctx),
+			updatetoken.NewClient(sandbox.GenerateExpiringToken(chainExpireTimeout)),
+			adapters.NewServerToClient(server),
+		)
+		_ = refresh.NewClient
+	}
+
+	generateRequests(t, client, refreshTester, chainRequests, chainStepDuration)
+}
+
+func TestRefreshClient_Sandbox(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	logrus.SetLevel(logrus.TraceLevel)
+	// logrus.SetOutput(ioutil.Discard)
+	ctx, cancel := context.WithTimeout(context.Background(), sandboxTotalTimeout)
+	defer cancel()
+
+	tokenGenerator := sandbox.GenerateExpiringToken(sandboxExpireTimeout)
+
+	domain := sandbox.NewBuilder(t).
+		SetNodesCount(2).
+		SetContext(ctx).
+		SetRegistryProxySupplier(nil).
+		SetTokenGenerateFunc(tokenGenerator).
+		Build()
+	defer domain.Cleanup()
+
+	nseReg := &registry.NetworkServiceEndpoint{
+		Name:                "final-endpoint",
+		NetworkServiceNames: []string{"my-service-remote"},
+	}
+
+	refreshSrv := newRefreshTesterServer(t, 0, sandboxExpireTimeout)
+	_, err := sandbox.NewEndpoint(ctx, nseReg, tokenGenerator, domain.Nodes[0].NSMgr, refreshSrv)
+	require.NoError(t, err)
+
+	nsc := sandbox.NewClient(ctx, tokenGenerator, domain.Nodes[1].NSMgr.URL)
+
+	generateRequests(t, nsc, refreshSrv, sandboxRequests, sandboxStepDuration)
 }
