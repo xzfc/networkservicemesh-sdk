@@ -125,8 +125,6 @@ func (t *refreshTesterServer) beforeRequest(marker string) {
 	require.Contains(t.t, []refreshTesterServerState{testRefreshStateInit, testRefreshStateRunning}, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitRequest
 	t.nextMarker = marker
-
-	logrus.Tracef("refreshTesterServer.beforeRequest(%#v)", marker)
 }
 
 func (t *refreshTesterServer) afterRequest() {
@@ -135,8 +133,6 @@ func (t *refreshTesterServer) afterRequest() {
 	t.checkUnlocked()
 	require.Equal(t.t, testRefreshStateDoneRequest, t.state, "Unexpected state")
 	t.state = testRefreshStateRunning
-
-	logrus.Tracef("refreshTesterServer.afterRequest()")
 }
 
 func (t *refreshTesterServer) beforeClose() {
@@ -145,8 +141,6 @@ func (t *refreshTesterServer) beforeClose() {
 	t.checkUnlocked()
 	require.Equal(t.t, testRefreshStateRunning, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitClose
-
-	logrus.Tracef("refreshTesterServer.beforeClose()")
 }
 
 func (t *refreshTesterServer) afterClose() {
@@ -156,8 +150,6 @@ func (t *refreshTesterServer) afterClose() {
 	require.Equal(t.t, testRefreshStateDoneClose, t.state, "Unexpected state")
 	t.state = testRefreshStateInit
 	t.currentMarker = ""
-
-	logrus.Tracef("refreshTesterServer.afterClose()")
 }
 
 func (t *refreshTesterServer) checkUnlocked() {

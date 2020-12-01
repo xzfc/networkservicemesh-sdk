@@ -229,8 +229,7 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 	_, err := sandbox.NewEndpoint(ctx, nseReg, tokenGenerator, domain.Nodes[0].NSMgr, refreshSrv)
 	require.NoError(t, err)
 
-	nsc, err := sandbox.NewClient(ctx, tokenGenerator, domain.Nodes[1].NSMgr.URL)
-	require.NoError(t, err)
+	nsc := sandbox.NewClient(ctx, tokenGenerator, domain.Nodes[1].NSMgr.URL)
 
 	generateRequests(t, nsc, refreshSrv, sandboxRequests, sandboxStepDuration)
 }

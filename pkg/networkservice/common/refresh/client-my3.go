@@ -21,6 +21,7 @@ package refresh
 import (
 	"context"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
+	"github.com/pkg/errors"
 	"sync"
 	"time"
 
@@ -50,9 +51,9 @@ func (q *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 
 	rv, err := next.Client(ctx).Request(ctx, request.Clone(), opts...)
 
-	executor := serialize.RequestExecutor(ctx)
+	executor := serialize.GetExecutor(ctx)
 	if executor == nil {
-		panic("Executor is nil")
+		return nil, errors.New("no executor provided")
 	}
 	request.Connection = rv.Clone()
 	nextClient := next.Client(ctx)
@@ -96,19 +97,19 @@ func (q *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 
 	var timer *time.Timer
 	timer = time.AfterFunc(duration, func() {
-		exec.AsyncExec(func() error {
+		exec.AsyncExec(func() {
 			oldTimer, _ := q.timers.LoadAndDelete(connectionID)
 			if oldTimer == nil {
-				return nil
+				return
 			}
 			if oldTimer.(*time.Timer) != timer {
 				oldTimer.(*time.Timer).Stop()
-				return nil
+				return
 			}
 
 			if q.ctx.Err() != nil {
 				// Context is canceled or deadlined.
-				return nil
+				return
 			}
 
 			rv, err := nextClient.Request(q.ctx, request.Clone(), opts...)
@@ -118,8 +119,6 @@ func (q *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 			}
 
 			q.startTimer(connectionID, exec, nextClient, request, opts)
-
-			return nil
 		})
 	})
 	q.timers.Store(connectionID, timer)
