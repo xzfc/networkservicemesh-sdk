@@ -38,16 +38,18 @@ type refreshClient3 struct {
 	timers sync.Map
 }
 
-func NewClient3(ctx context.Context) *refreshClient3 {
+// NewClient3 - creates new NetworkServiceClient chain element for refreshing
+// connections before they timeout at the endpoint.
+func NewClient3(ctx context.Context) networkservice.NetworkServiceClient {
 	return &refreshClient3{
 		ctx:    ctx,
 		timers: sync.Map{},
 	}
 }
 
-func (q *refreshClient3) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
+func (t *refreshClient3) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
 	connectionID := request.Connection.Id
-	q.stopTimer(connectionID)
+	t.stopTimer(connectionID)
 
 	rv, err := next.Client(ctx).Request(ctx, request.Clone(), opts...)
 
@@ -57,24 +59,24 @@ func (q *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 	}
 	request.Connection = rv.Clone()
 	nextClient := next.Client(ctx)
-	q.startTimer(connectionID, executor, nextClient, request, opts)
+	t.startTimer(connectionID, executor, nextClient, request, opts)
 
 	return rv, err
 }
 
-func (q *refreshClient3) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (e *empty.Empty, err error) {
-	q.stopTimer(conn.Id)
+func (t *refreshClient3) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (e *empty.Empty, err error) {
+	t.stopTimer(conn.Id)
 	return next.Client(ctx).Close(ctx, conn, opts...)
 }
 
-func (q *refreshClient3) stopTimer(connectionID string) {
-	value, loaded := q.timers.LoadAndDelete(connectionID)
+func (t *refreshClient3) stopTimer(connectionID string) {
+	value, loaded := t.timers.LoadAndDelete(connectionID)
 	if loaded {
 		value.(*time.Timer).Stop()
 	}
 }
 
-func (q *refreshClient3) startTimer(connectionID string, exec serialize.Executor, nextClient networkservice.NetworkServiceClient, request *networkservice.NetworkServiceRequest, opts []grpc.CallOption) {
+func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor, nextClient networkservice.NetworkServiceClient, request *networkservice.NetworkServiceRequest, opts []grpc.CallOption) {
 	path := request.GetConnection().GetPath()
 	if path == nil || path.PathSegments == nil || len(path.PathSegments) == 0 ||
 		path.Index >= uint32(len(path.PathSegments)) {
@@ -98,7 +100,7 @@ func (q *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 	var timer *time.Timer
 	timer = time.AfterFunc(duration, func() {
 		exec.AsyncExec(func() {
-			oldTimer, _ := q.timers.LoadAndDelete(connectionID)
+			oldTimer, _ := t.timers.LoadAndDelete(connectionID)
 			if oldTimer == nil {
 				return
 			}
@@ -107,19 +109,19 @@ func (q *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 				return
 			}
 
-			if q.ctx.Err() != nil {
+			if t.ctx.Err() != nil {
 				// Context is canceled or deadlined.
 				return
 			}
 
-			rv, err := nextClient.Request(q.ctx, request.Clone(), opts...)
+			rv, err := nextClient.Request(t.ctx, request.Clone(), opts...)
 
 			if err == nil && rv != nil {
 				request.Connection = rv
 			}
 
-			q.startTimer(connectionID, exec, nextClient, request, opts)
+			t.startTimer(connectionID, exec, nextClient, request, opts)
 		})
 	})
-	q.timers.Store(connectionID, timer)
+	t.timers.Store(connectionID, timer)
 }

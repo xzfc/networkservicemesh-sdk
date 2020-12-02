@@ -238,6 +238,7 @@ func mkRequest(marker string, conn *networkservice.Connection) *networkservice.N
 }
 
 func generateRequests(t *testing.T, client networkservice.NetworkServiceClient, refreshTester *refreshTesterServer, iterations int, tickDuration time.Duration) {
+	//nolint:gosec // Predictable random number generator is OK for testing purposes.
 	randSrc := rand.New(rand.NewSource(0))
 
 	ctx, cancel := context.WithCancel(context.Background())

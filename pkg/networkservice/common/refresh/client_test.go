@@ -105,8 +105,9 @@ func TestRefreshClient_Stress(t *testing.T) {
 			iterations:    10,
 		},
 	}
-	for _, q := range table {
-		t.Run(q.name, func(t *testing.T) { runStressTest(t, &q) })
+	for i := range table {
+		it := &table[i]
+		t.Run(it.name, func(t *testing.T) { runStressTest(t, it) })
 	}
 }
 
