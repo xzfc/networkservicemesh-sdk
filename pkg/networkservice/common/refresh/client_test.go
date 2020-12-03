@@ -20,7 +20,6 @@ import (
 	"context"
 	"github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -140,7 +139,13 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 
 func TestRefreshClient_Sandbox(t *testing.T) {
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
-	logrus.SetOutput(ioutil.Discard)
+
+	logrus.Infof("Sandbox test(1)")
+	level := logrus.GetLevel()
+	logrus.SetLevel(logrus.TraceLevel)
+	defer logrus.SetLevel(level)
+	logrus.Infof("Sandbox test(2)")
+	// logrus.SetOutput(ioutil.Discard)
 
 	ctx, cancel := context.WithTimeout(context.Background(), sandboxTotalTimeout)
 	defer cancel()

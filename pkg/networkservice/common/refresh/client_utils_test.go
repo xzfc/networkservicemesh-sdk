@@ -206,7 +206,7 @@ func (t *refreshTesterServer) Close(ctx context.Context, connection *networkserv
 	}()
 	t.checkUnlocked()
 
-	require.Equal(t.t, t.state, testRefreshStateWaitClose, "Unexpected state")
+	require.Equal(t.t, testRefreshStateWaitClose, t.state, "Unexpected state")
 	t.state = testRefreshStateDoneClose
 
 	t.mutex.Unlock()
