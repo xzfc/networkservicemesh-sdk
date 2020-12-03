@@ -17,7 +17,7 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=9
   test-win:
     # if: false
     name: test-win
@@ -33,7 +33,7 @@ jobs:
         run: |
           $env:Path += ";$(go env GOPATH)\bin"
           mkdir $home/junit
-          gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20
+          gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=9
   test-osx:
     name: test-osx
     runs-on: macos-latest
@@ -48,4 +48,4 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=9
