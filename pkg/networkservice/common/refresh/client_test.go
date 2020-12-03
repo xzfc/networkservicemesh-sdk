@@ -46,10 +46,10 @@ const (
 	neverTimeout      = 5 * expireTimeout
 	maxDuration       = 100 * time.Hour
 
-	sandboxExpireTimeout = 5 * time.Second
-	sandboxMinDuration   = 500 * time.Millisecond
-	sandboxStepDuration  = 5 * time.Second
-	sandboxRequests      = 10
+	sandboxExpireTimeout = 10 * time.Second
+	sandboxMinDuration   = 1 * time.Second
+	sandboxStepDuration  = 10 * time.Second
+	sandboxRequests      = 5
 	sandboxTotalTimeout  = 80 * time.Second
 )
 

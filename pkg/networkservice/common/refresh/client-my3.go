@@ -54,8 +54,12 @@ func (t *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 
 	t0 := time.Now()
 	rv, err := next.Client(ctx).Request(ctx, request.Clone(), opts...)
-	path := rv.Path
-	fmt.Printf("Refresh[%v]: done first for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+	path := rv.GetPath()
+	if path == nil {
+		fmt.Printf("Refresh[%v]: done first, got err delta=%v\n", time.Now(), time.Now().Sub(t0))
+	} else {
+		fmt.Printf("Refresh[%v]: done first for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+	}
 
 	executor := serialize.GetExecutor(ctx)
 	if executor == nil {
