@@ -32,9 +32,9 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
@@ -66,7 +66,7 @@ func (c *countClient) Request(ctx context.Context, request *networkservice.Netwo
 	if atomic.AddInt32(&c.count, 1) == 1 {
 		conn.NetworkServiceEndpointName = endpointName
 	} else {
-		require.Equal(c.t, endpointName, conn.NetworkServiceEndpointName)
+		assert.Equal(c.t, endpointName, conn.NetworkServiceEndpointName)
 	}
 
 	return next.Client(ctx).Request(ctx, request, opts...)
@@ -123,54 +123,50 @@ func (t *refreshTesterServer) beforeRequest(marker string) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.checkUnlocked()
-	require.Contains(t.t, []refreshTesterServerState{testRefreshStateInit, testRefreshStateRunning}, t.state, "Unexpected state")
+	assert.Contains(t.t, []refreshTesterServerState{testRefreshStateInit, testRefreshStateRunning}, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitRequest
 	t.nextMarker = marker
-
-	fmt.Println("beforeRequest")
+	if refresh.EnableTestLog { fmt.Println("beforeRequest") }
 }
 
 func (t *refreshTesterServer) afterRequest() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.checkUnlocked()
-	require.Equal(t.t, testRefreshStateDoneRequest, t.state, "Unexpected state")
+	assert.Equal(t.t, testRefreshStateDoneRequest, t.state, "Unexpected state")
 	t.state = testRefreshStateRunning
-
-	fmt.Println("afterRequest")
+	if refresh.EnableTestLog { fmt.Println("afterRequest") }
 }
 
 func (t *refreshTesterServer) beforeClose() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.checkUnlocked()
-	require.Equal(t.t, testRefreshStateRunning, t.state, "Unexpected state")
+	assert.Equal(t.t, testRefreshStateRunning, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitClose
-
-	fmt.Println("beforeClose")
+	if refresh.EnableTestLog { fmt.Println("beforeClose") }
 }
 
 func (t *refreshTesterServer) afterClose() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.checkUnlocked()
-	require.Equal(t.t, testRefreshStateDoneClose, t.state, "Unexpected state")
+	assert.Equal(t.t, testRefreshStateDoneClose, t.state, "Unexpected state")
 	t.state = testRefreshStateInit
 	t.currentMarker = ""
-
-	fmt.Println("afterClose")
+	if refresh.EnableTestLog { fmt.Println("afterClose") }
 }
 
 func (t *refreshTesterServer) checkUnlocked() {
 	if t.state == testRefreshStateDoneRequest || t.state == testRefreshStateRunning {
 		delta := time.Now().UTC().Sub(t.lastSeen)
-		require.Lessf(t.t, int64(delta), int64(t.maxDuration), "Duration expired (too slow) delta=%v max=%v", delta, t.maxDuration)
+		assert.Lessf(t.t, int64(delta), int64(t.maxDuration), "Duration expired (too slow) delta=%v max=%v", delta, t.maxDuration)
 	}
 }
 
 func (t *refreshTesterServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
-	fmt.Println("Request")
 	t.mutex.Lock()
+	if refresh.EnableTestLog { fmt.Println("Request") }
 	locked := true
 	defer func() {
 		if locked {
@@ -180,21 +176,21 @@ func (t *refreshTesterServer) Request(ctx context.Context, request *networkservi
 	t.checkUnlocked()
 
 	marker := request.Connection.Context.ExtraContext[connectionMarker]
-	require.NotEmpty(t.t, marker, "Marker is empty")
+	assert.NotEmpty(t.t, marker, "Marker is empty")
 
 	switch t.state {
 	case testRefreshStateWaitRequest:
-		require.Contains(t.t, []string{t.nextMarker, t.currentMarker}, marker, "Unexpected marker")
+		assert.Contains(t.t, []string{t.nextMarker, t.currentMarker}, marker, "Unexpected marker")
 		if marker == t.nextMarker {
 			t.state = testRefreshStateDoneRequest
 			t.currentMarker = t.nextMarker
 		}
 	case testRefreshStateDoneRequest, testRefreshStateRunning, testRefreshStateWaitClose:
-		require.Equal(t.t, t.currentMarker, marker, "Unexpected marker")
+		assert.Equal(t.t, t.currentMarker, marker, "Unexpected marker")
 		delta := time.Now().UTC().Sub(t.lastSeen)
-		require.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
+		assert.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
 	default:
-		require.Fail(t.t, "Unexpected state", t.state)
+		assert.Fail(t.t, "Unexpected state", t.state)
 	}
 
 	t.lastSeen = time.Now()
@@ -206,8 +202,8 @@ func (t *refreshTesterServer) Request(ctx context.Context, request *networkservi
 }
 
 func (t *refreshTesterServer) Close(ctx context.Context, connection *networkservice.Connection) (*empty.Empty, error) {
-	fmt.Println("Close")
 	t.mutex.Lock()
+	if refresh.EnableTestLog { fmt.Println("Close") }
 	locked := true
 	defer func() {
 		if locked {
@@ -217,7 +213,7 @@ func (t *refreshTesterServer) Close(ctx context.Context, connection *networkserv
 	}()
 	t.checkUnlocked()
 
-	require.Equal(t.t, testRefreshStateWaitClose, t.state, "Unexpected state")
+	assert.Equal(t.t, testRefreshStateWaitClose, t.state, "Unexpected state")
 	t.state = testRefreshStateDoneClose
 
 	t.mutex.Unlock()
@@ -265,11 +261,15 @@ func generateRequests(t *testing.T, client networkservice.NetworkServiceClient, 
 		oldConn = conn
 
 		if t.Failed() {
-			break
+			return
 		}
 
 		if randSrc.Int31n(10) != 0 {
 			time.Sleep(tickDuration)
+		}
+
+		if t.Failed() {
+			return
 		}
 
 		if randSrc.Int31n(10) == 0 {

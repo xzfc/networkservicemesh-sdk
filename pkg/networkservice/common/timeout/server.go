@@ -21,6 +21,7 @@ package timeout
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -72,6 +73,7 @@ func (t *timeoutServer) Request(ctx context.Context, request *networkservice.Net
 
 	timer, err := t.createTimer(ctx, conn)
 	if err != nil {
+		fmt.Println("Timed out[2]!")
 		if _, closeErr := next.Server(ctx).Close(ctx, conn); closeErr != nil {
 			err = errors.Wrapf(err, "error attempting to close failed connection %v: %+v", connID, closeErr)
 		}
@@ -109,6 +111,7 @@ func (t *timeoutServer) createTimer(ctx context.Context, conn *networkservice.Co
 				return
 			}
 			t.timers.Delete(conn.GetId())
+			fmt.Println("Timed out!")
 			if _, err := next.Server(ctx).Close(t.ctx, conn); err != nil {
 				logEntry.Errorf("failed to close timed out connection: %v %+v", conn.GetId(), err)
 			}
