@@ -142,7 +142,7 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 
 	logrus.Infof("Sandbox test(1)")
 	level := logrus.GetLevel()
-	logrus.SetLevel(logrus.TraceLevel)
+	// logrus.SetLevel(logrus.TraceLevel)
 	defer logrus.SetLevel(level)
 	logrus.Infof("Sandbox test(2)")
 	// logrus.SetOutput(ioutil.Discard)
