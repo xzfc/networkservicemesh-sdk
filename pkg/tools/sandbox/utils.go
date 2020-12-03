@@ -20,12 +20,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -48,16 +46,11 @@ func GenerateTestToken(_ credentials.AuthInfo) (tokenValue string, expireTime ti
 	return "TestToken", time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC), nil
 }
 
-var tokenId int32
-
 // GenerateExpiringToken returns a token generator with the specified expiration duration.
 func GenerateExpiringToken(duration time.Duration) token.GeneratorFunc {
 	value := fmt.Sprintf("TestToken-%s", duration)
 	return func(_ credentials.AuthInfo) (tokenValue string, expireTime time.Time, err error) {
-		value2 := fmt.Sprintf("%s-%d", value, atomic.AddInt32(&tokenId, 1))
-		expiringIn := time.Now().UTC().Add(duration)
-		logrus.Infof("GenerateExpiringToken: %#s, %v", value2, expiringIn)
-		return value2, expiringIn, nil
+		return value, time.Now().UTC().Add(duration), nil
 	}
 }
 
