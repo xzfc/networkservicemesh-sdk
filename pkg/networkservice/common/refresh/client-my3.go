@@ -31,6 +31,7 @@ import (
 
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/serialize"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/core/trace"
 )
 
 type refreshClient3 struct {
@@ -96,6 +97,8 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 		scale = 0.2 + 0.2*float64(path.Index)/float64(len(path.PathSegments))
 	}
 	duration := time.Duration(float64(time.Until(expireTime)) * scale)
+	trace.Log(context.Background()).Debugf("Refresh: init name=%v id=%v %v/%v scale=%v in=%v timeouts-in=%v at=%v",
+		path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, path.Index, len(path.PathSegments), scale, duration, time.Until(expireTime), time.Now().Add(duration))
 
 	var timer *time.Timer
 	timer = time.AfterFunc(duration, func() {
@@ -113,6 +116,8 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 				// Context is canceled or deadlined.
 				return
 			}
+
+			trace.Log(context.Background()).Debugf("Refresh: repeating for name=%v id=%v", path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id)
 
 			rv, err := nextClient.Request(t.ctx, request.Clone(), opts...)
 
