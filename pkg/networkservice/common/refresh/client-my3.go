@@ -104,8 +104,9 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 		time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, path.Index, len(path.PathSegments), scale, duration, time.Until(expireTime), time.Now().Add(duration))
 
 	var timer *time.Timer
+	timerStart := time.Now()
 	timer = time.AfterFunc(duration, func() {
-		fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id)
+		fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v duration(exp/act)=%v/%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, duration, time.Now().Sub(timerStart))
 		exec.AsyncExec(func() {
 			oldTimer, _ := t.timers.LoadAndDelete(connectionID)
 			if oldTimer == nil {
