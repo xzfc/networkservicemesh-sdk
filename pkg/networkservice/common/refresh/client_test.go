@@ -18,6 +18,9 @@ package refresh_test
 
 import (
 	"context"
+	"github.com/networkservicemesh/api/pkg/api/registry"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -42,6 +45,12 @@ const (
 	tickTimeout       = 50 * time.Millisecond
 	neverTimeout      = 5 * expireTimeout
 	maxDuration       = 100 * time.Hour
+
+	sandboxExpireTimeout = 3 * time.Second
+	sandboxMinDuration   = 500 * time.Millisecond
+	sandboxStepDuration  = 5 * time.Second
+	sandboxRequests      = 10
+	sandboxTotalTimeout  = 80 * time.Second
 )
 
 func TestRefreshClient_StopRefreshAtClose(t *testing.T) {
@@ -127,4 +136,35 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 	)
 
 	generateRequests(t, client, refreshTester, conf.iterations, conf.tickDuration)
+}
+
+func TestRefreshClient_Sandbox(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	logrus.SetOutput(ioutil.Discard)
+
+	ctx, cancel := context.WithTimeout(context.Background(), sandboxTotalTimeout)
+	defer cancel()
+
+	tokenGenerator := sandbox.GenerateExpiringToken(sandboxExpireTimeout)
+
+	domain := sandbox.NewBuilder(t).
+		SetNodesCount(2).
+		SetContext(ctx).
+		SetRegistryProxySupplier(nil).
+		SetTokenGenerateFunc(tokenGenerator).
+		Build()
+	defer domain.Cleanup()
+
+	nseReg := &registry.NetworkServiceEndpoint{
+		Name:                "final-endpoint",
+		NetworkServiceNames: []string{"my-service-remote"},
+	}
+
+	refreshSrv := newRefreshTesterServer(t, sandboxMinDuration, sandboxExpireTimeout)
+	_, err := sandbox.NewEndpoint(ctx, nseReg, tokenGenerator, domain.Nodes[0].NSMgr, refreshSrv)
+	require.NoError(t, err)
+
+	nsc := sandbox.NewClient(ctx, tokenGenerator, domain.Nodes[1].NSMgr.URL)
+
+	generateRequests(t, nsc, refreshSrv, sandboxRequests, sandboxStepDuration)
 }
