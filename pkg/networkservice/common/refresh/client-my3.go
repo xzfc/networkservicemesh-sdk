@@ -55,10 +55,12 @@ func (t *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 	t0 := time.Now()
 	rv, err := next.Client(ctx).Request(ctx, request.Clone(), opts...)
 	path := rv.GetPath()
-	if path == nil {
-		fmt.Printf("Refresh[%v]: done first, got err delta=%v\n", time.Now(), time.Now().Sub(t0))
-	} else {
-		fmt.Printf("Refresh[%v]: done first for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+	if false {
+		if path == nil {
+			fmt.Printf("Refresh[%v]: done first, got err delta=%v\n", time.Now(), time.Now().Sub(t0))
+		} else {
+			fmt.Printf("Refresh[%v]: done first for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+		}
 	}
 
 	executor := serialize.GetExecutor(ctx)
@@ -104,13 +106,17 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 		scale = 0.2 + 0.2*float64(path.Index)/float64(len(path.PathSegments))
 	}
 	duration := time.Duration(float64(time.Until(expireTime)) * scale)
-	fmt.Printf("Refresh[%v]: init name=%v id=%v %v/%v scale=%v in=%v timeouts-in=%v at=%v\n",
-		time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, path.Index, len(path.PathSegments), scale, duration, time.Until(expireTime), time.Now().Add(duration))
+	if false {
+		fmt.Printf("Refresh[%v]: init name=%v id=%v %v/%v scale=%v in=%v timeouts-in=%v at=%v\n",
+			time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, path.Index, len(path.PathSegments), scale, duration, time.Until(expireTime), time.Now().Add(duration))
+	}
 
 	var timer *time.Timer
 	timerStart := time.Now()
 	timer = time.AfterFunc(duration, func() {
-		fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v duration(exp/act)=%v/%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, duration, time.Now().Sub(timerStart))
+		if false {
+			fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v duration(exp/act)=%v/%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, duration, time.Now().Sub(timerStart))
+		}
 		exec.AsyncExec(func() {
 			oldTimer, _ := t.timers.LoadAndDelete(connectionID)
 			if oldTimer == nil {
@@ -126,11 +132,15 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 				return
 			}
 
-			fmt.Printf("Refresh[%v]: running repeating for name=%v id=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id)
+			if false {
+				fmt.Printf("Refresh[%v]: running repeating for name=%v id=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id)
+			}
 
 			t0 := time.Now()
 			rv, err := nextClient.Request(t.ctx, request.Clone(), opts...)
-			fmt.Printf("Refresh[%v]: done repeating for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+			if false {
+				fmt.Printf("Refresh[%v]: done repeating for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+			}
 
 			if err == nil && rv != nil {
 				request.Connection = rv

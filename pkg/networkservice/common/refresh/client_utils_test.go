@@ -18,6 +18,7 @@ package refresh_test
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -125,6 +126,8 @@ func (t *refreshTesterServer) beforeRequest(marker string) {
 	require.Contains(t.t, []refreshTesterServerState{testRefreshStateInit, testRefreshStateRunning}, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitRequest
 	t.nextMarker = marker
+
+	fmt.Println("beforeRequest")
 }
 
 func (t *refreshTesterServer) afterRequest() {
@@ -133,6 +136,8 @@ func (t *refreshTesterServer) afterRequest() {
 	t.checkUnlocked()
 	require.Equal(t.t, testRefreshStateDoneRequest, t.state, "Unexpected state")
 	t.state = testRefreshStateRunning
+
+	fmt.Println("afterRequest")
 }
 
 func (t *refreshTesterServer) beforeClose() {
@@ -141,6 +146,8 @@ func (t *refreshTesterServer) beforeClose() {
 	t.checkUnlocked()
 	require.Equal(t.t, testRefreshStateRunning, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitClose
+
+	fmt.Println("beforeClose")
 }
 
 func (t *refreshTesterServer) afterClose() {
@@ -150,6 +157,8 @@ func (t *refreshTesterServer) afterClose() {
 	require.Equal(t.t, testRefreshStateDoneClose, t.state, "Unexpected state")
 	t.state = testRefreshStateInit
 	t.currentMarker = ""
+
+	fmt.Println("afterClose")
 }
 
 func (t *refreshTesterServer) checkUnlocked() {
@@ -160,6 +169,7 @@ func (t *refreshTesterServer) checkUnlocked() {
 }
 
 func (t *refreshTesterServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
+	fmt.Println("Request")
 	t.mutex.Lock()
 	locked := true
 	defer func() {
@@ -196,6 +206,7 @@ func (t *refreshTesterServer) Request(ctx context.Context, request *networkservi
 }
 
 func (t *refreshTesterServer) Close(ctx context.Context, connection *networkservice.Connection) (*empty.Empty, error) {
+	fmt.Println("Close")
 	t.mutex.Lock()
 	locked := true
 	defer func() {
