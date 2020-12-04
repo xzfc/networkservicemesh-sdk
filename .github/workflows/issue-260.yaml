@@ -3,7 +3,7 @@ name: ci-issue-260-refresh
 on: push
 jobs:
   test:
-    # if: false
+    if: false
     name: test
     runs-on: ubuntu-latest
     steps:
@@ -31,7 +31,7 @@ jobs:
       #     eval $(go env)
       #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
   test-win:
-    # if: false
+    if: false
     name: test-win
     runs-on: windows-latest
     steps:
@@ -72,16 +72,43 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=1 -run TestTimers
-       # - name: Run tests[2]
-       #   run: |
-       #     eval $(go env)
-       #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-       # - name: Run tests[3]
-       #   run: |
-       #     eval $(go env)
-       #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-       # - name: Run tests[4]
-       #   run: |
-       #     eval $(go env)
-       #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
+      - name: Run tests[2]
+        run: |
+          eval $(go env)
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
+      - name: Run tests[3]
+        run: |
+          eval $(go env)
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
+      - name: Run tests[4]
+        run: |
+          eval $(go env)
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
+  test-osx2:
+    name: test-osx2
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v1
+        with:
+          go-version: 1.15
+      - name: Install gotestsum
+        run: go get gotest.tools/gotestsum@v0.4.0
+      - name: Run tests
+        run: |
+          eval $(go env)
+          mkdir -p ~/junit/
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
+      - name: Run tests[2]
+        run: |
+          eval $(go env)
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
+      - name: Run tests[3]
+        run: |
+          eval $(go env)
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
+      - name: Run tests[4]
+        run: |
+          eval $(go env)
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=4 -run TestRefreshClient_Sandbox
