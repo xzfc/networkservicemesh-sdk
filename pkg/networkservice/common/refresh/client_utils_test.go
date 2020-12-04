@@ -181,7 +181,7 @@ func (t *refreshTesterServer) Request(ctx context.Context, request *networkservi
 	case testRefreshStateDoneRequest, testRefreshStateRunning, testRefreshStateWaitClose:
 		assert.Equal(t.t, t.currentMarker, marker, "Unexpected marker")
 		delta := time.Now().UTC().Sub(t.lastSeen)
-		assert.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
+		assert.GreaterOrEqual(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
 	default:
 		assert.Fail(t.t, "Unexpected state", t.state)
 	}
