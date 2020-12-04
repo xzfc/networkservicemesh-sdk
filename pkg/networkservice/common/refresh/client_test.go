@@ -97,14 +97,14 @@ type stressTestConfig struct {
 
 func TestRefreshClient_Stress(t *testing.T) {
 	table := []stressTestConfig{
-		{
-			name:          "RaceConditions",
-			expireTimeout: 2 * time.Millisecond,
-			minDuration:   0,
-			maxDuration:   maxDuration,
-			tickDuration:  8100 * time.Microsecond,
-			iterations:    100,
-		},
+		// {
+		// 	name:          "RaceConditions",
+		// 	expireTimeout: 2 * time.Millisecond,
+		// 	minDuration:   0,
+		// 	maxDuration:   maxDuration,
+		// 	tickDuration:  8100 * time.Microsecond,
+		// 	iterations:    100,
+		// },
 		{
 			name:          "Durations",
 			expireTimeout: 500 * time.Millisecond,
@@ -134,6 +134,8 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 		updatetoken.NewClient(sandbox.GenerateExpiringToken(conf.expireTimeout)),
 		adapters.NewServerToClient(refreshTester),
 	)
+
+	refresh.SetEnableTestLog(true)
 
 	generateRequests(t, client, refreshTester, conf.iterations, conf.tickDuration)
 }
