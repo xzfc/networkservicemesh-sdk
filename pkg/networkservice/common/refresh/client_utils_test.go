@@ -129,7 +129,7 @@ func (t *refreshTesterServer) beforeRequest(marker string) {
 	assert.Contains(t.t, []refreshTesterServerState{testRefreshStateInit, testRefreshStateRunning}, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitRequest
 	t.nextMarker = marker
-	if refresh.EnableTestLog { fmt.Println("beforeRequest") }
+	if refresh.GetEnableTestLog() { fmt.Println("beforeRequest") }
 }
 
 func (t *refreshTesterServer) afterRequest() {
@@ -138,7 +138,7 @@ func (t *refreshTesterServer) afterRequest() {
 	t.checkUnlocked()
 	assert.Equal(t.t, testRefreshStateDoneRequest, t.state, "Unexpected state")
 	t.state = testRefreshStateRunning
-	if refresh.EnableTestLog { fmt.Println("afterRequest") }
+	if refresh.GetEnableTestLog() { fmt.Println("afterRequest") }
 }
 
 func (t *refreshTesterServer) beforeClose() {
@@ -147,7 +147,7 @@ func (t *refreshTesterServer) beforeClose() {
 	t.checkUnlocked()
 	assert.Equal(t.t, testRefreshStateRunning, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitClose
-	if refresh.EnableTestLog { fmt.Println("beforeClose") }
+	if refresh.GetEnableTestLog() { fmt.Println("beforeClose") }
 }
 
 func (t *refreshTesterServer) afterClose() {
@@ -157,7 +157,7 @@ func (t *refreshTesterServer) afterClose() {
 	assert.Equal(t.t, testRefreshStateDoneClose, t.state, "Unexpected state")
 	t.state = testRefreshStateInit
 	t.currentMarker = ""
-	if refresh.EnableTestLog { fmt.Println("afterClose") }
+	if refresh.GetEnableTestLog() { fmt.Println("afterClose") }
 }
 
 func (t *refreshTesterServer) checkUnlocked() {
@@ -169,7 +169,7 @@ func (t *refreshTesterServer) checkUnlocked() {
 
 func (t *refreshTesterServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
 	t.mutex.Lock()
-	if refresh.EnableTestLog { fmt.Println("Request") }
+	if refresh.GetEnableTestLog() { fmt.Println("Request") }
 	locked := true
 	defer func() {
 		if locked {
@@ -218,7 +218,7 @@ func (t *refreshTesterServer) Request(ctx context.Context, request *networkservi
 
 func (t *refreshTesterServer) Close(ctx context.Context, connection *networkservice.Connection) (*empty.Empty, error) {
 	t.mutex.Lock()
-	if refresh.EnableTestLog { fmt.Println("Close") }
+	if refresh.GetEnableTestLog() { fmt.Println("Close") }
 	locked := true
 	defer func() {
 		if locked {

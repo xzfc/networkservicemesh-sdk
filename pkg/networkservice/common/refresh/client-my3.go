@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -48,7 +49,17 @@ func NewClient3(ctx context.Context) networkservice.NetworkServiceClient {
 	}
 }
 
-var EnableTestLog bool
+var enableTestLog int32
+func SetEnableTestLog(b bool) {
+	var bb int32
+	if b {
+		bb = 1
+	}
+	atomic.StoreInt32(&enableTestLog, bb)
+}
+func GetEnableTestLog() bool {
+	return atomic.LoadInt32(&enableTestLog) == 1
+}
 
 func (t *refreshClient3) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
 	connectionID := request.Connection.Id
@@ -57,7 +68,7 @@ func (t *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 	t0 := time.Now()
 	rv, err := next.Client(ctx).Request(ctx, request.Clone(), opts...)
 	path := rv.GetPath()
-	if EnableTestLog {
+	if GetEnableTestLog() {
 		if path == nil {
 			fmt.Printf("Refresh[%v]: done first, got err delta=%v\n", time.Now(), time.Now().Sub(t0))
 		} else {
@@ -108,7 +119,7 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 		scale = 0.2 + 0.2*float64(path.Index)/float64(len(path.PathSegments))
 	}
 	duration := time.Duration(float64(time.Until(expireTime)) * scale)
-	if EnableTestLog {
+	if GetEnableTestLog() {
 		fmt.Printf("Refresh[%v]: init name=%v id=%v %v/%v scale=%v in=%v timeouts-in=%v at=%v\n",
 			time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, path.Index, len(path.PathSegments), scale, duration, time.Until(expireTime), time.Now().Add(duration))
 	}
@@ -116,7 +127,7 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 	var timer *time.Timer
 	timerStart := time.Now()
 	timer = time.AfterFunc(duration, func() {
-		if EnableTestLog {
+		if GetEnableTestLog() {
 			fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v duration(exp/act)=%v/%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, duration, time.Now().Sub(timerStart))
 		}
 		exec.AsyncExec(func() {
@@ -134,13 +145,13 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 				return
 			}
 
-			if EnableTestLog {
+			if GetEnableTestLog() {
 				fmt.Printf("Refresh[%v]: running repeating for name=%v id=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id)
 			}
 
 			t0 := time.Now()
 			rv, err := nextClient.Request(t.ctx, request.Clone(), opts...)
-			if EnableTestLog {
+			if GetEnableTestLog() {
 				fmt.Printf("Refresh[%v]: done repeating for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
 			}
 

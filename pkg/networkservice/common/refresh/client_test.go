@@ -145,9 +145,9 @@ func TestRefreshClient_Sandbox(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), sandboxTotalTimeout)
 	defer cancel()
 
-	refresh.EnableTestLog = true
+	refresh.SetEnableTestLog(true)
 	defer func() {
-		refresh.EnableTestLog = false
+		refresh.SetEnableTestLog(false)
 	}()
 
 	tokenGenerator := sandbox.GenerateExpiringToken(sandboxExpireTimeout)
