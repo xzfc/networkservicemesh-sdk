@@ -109,7 +109,7 @@ func TestRefreshClient_Stress(t *testing.T) {
 			name:          "Durations",
 			expireTimeout: 500 * time.Millisecond,
 			minDuration:   100 * time.Millisecond,
-			maxDuration:   500 * time.Millisecond,
+			maxDuration:   5000 * time.Millisecond, // 500
 			tickDuration:  409 * time.Millisecond,
 			iterations:    10,
 		},
