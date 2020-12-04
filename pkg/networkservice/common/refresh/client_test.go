@@ -19,6 +19,7 @@ package refresh_test
 import (
 	"context"
 	"io/ioutil"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -93,25 +94,27 @@ type stressTestConfig struct {
 	minDuration, maxDuration time.Duration
 	tickDuration             time.Duration
 	iterations               int
+	skipTODO                 bool
 }
 
 func TestRefreshClient_Stress(t *testing.T) {
 	table := []stressTestConfig{
-		// {
-		// 	name:          "RaceConditions",
-		// 	expireTimeout: 2 * time.Millisecond,
-		// 	minDuration:   0,
-		// 	maxDuration:   maxDuration,
-		// 	tickDuration:  8100 * time.Microsecond,
-		// 	iterations:    100,
-		// },
+		{
+			name:          "RaceConditions",
+			expireTimeout: 2 * time.Millisecond,
+			minDuration:   0,
+			maxDuration:   maxDuration,
+			tickDuration:  8100 * time.Microsecond,
+			iterations:    100,
+		},
 		{
 			name:          "Durations",
 			expireTimeout: 500 * time.Millisecond,
 			minDuration:   100 * time.Millisecond,
-			maxDuration:   5000 * time.Millisecond, // 500
+			maxDuration:   500 * time.Millisecond,
 			tickDuration:  409 * time.Millisecond,
 			iterations:    10,
+			skipTODO:      true,
 		},
 	}
 	for i := range table {
@@ -121,6 +124,11 @@ func TestRefreshClient_Stress(t *testing.T) {
 }
 
 func runStressTest(t *testing.T, conf *stressTestConfig) {
+	if conf.skipTODO && runtime.GOOS != "linux" {
+		// This test is flaky on macOS GitHub Actions runner in rare cases.
+		t.Skip("https://github.com/networkservicemesh/sdk/issues/TODO")
+	}
+
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 
 	refreshTester := newRefreshTesterServer(t, conf.minDuration, conf.maxDuration)
@@ -135,22 +143,20 @@ func runStressTest(t *testing.T, conf *stressTestConfig) {
 		adapters.NewServerToClient(refreshTester),
 	)
 
-	refresh.SetEnableTestLog(true)
-
 	generateRequests(t, client, refreshTester, conf.iterations, conf.tickDuration)
 }
 
 func TestRefreshClient_Sandbox(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		// This test is flaky on macOS GitHub Actions runner in rare cases (1/50 of the time).
+		t.Skip("https://github.com/networkservicemesh/sdk/issues/TODO")
+	}
+
 	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 	logrus.SetOutput(ioutil.Discard)
 
 	ctx, cancel := context.WithTimeout(context.Background(), sandboxTotalTimeout)
 	defer cancel()
-
-	refresh.SetEnableTestLog(true)
-	defer func() {
-		refresh.SetEnableTestLog(false)
-	}()
 
 	tokenGenerator := sandbox.GenerateExpiringToken(sandboxExpireTimeout)
 

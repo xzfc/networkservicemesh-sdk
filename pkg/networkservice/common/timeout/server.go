@@ -21,8 +21,6 @@ package timeout
 
 import (
 	"context"
-	"fmt"
-	"encoding/json"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -35,14 +33,6 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 )
-
-func ToJson(x interface{}) string {
-	b, err := json.Marshal(x)
-	if err != nil {
-		return err.Error()
-	}
-	return string(b)
-}
 
 type timeoutServer struct {
 	ctx    context.Context
@@ -61,7 +51,6 @@ func NewServer(ctx context.Context) networkservice.NetworkServiceServer {
 
 func (t *timeoutServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
 	logEntry := log.Entry(ctx).WithField("timeoutServer", "request")
-	fmt.Printf("Timeut[%v] request id=%v\n", time.Now(), request.GetConnection().GetId())
 
 	connID := request.GetConnection().GetId()
 
@@ -83,7 +72,6 @@ func (t *timeoutServer) Request(ctx context.Context, request *networkservice.Net
 
 	timer, err := t.createTimer(ctx, conn)
 	if err != nil {
-		fmt.Println("Timed out[2]!")
 		if _, closeErr := next.Server(ctx).Close(ctx, conn); closeErr != nil {
 			err = errors.Wrapf(err, "error attempting to close failed connection %v: %+v", connID, closeErr)
 		}
@@ -121,7 +109,6 @@ func (t *timeoutServer) createTimer(ctx context.Context, conn *networkservice.Co
 				return
 			}
 			t.timers.Delete(conn.GetId())
-			fmt.Printf("Timed out! id=%v path=%v\n", conn.GetId(), ToJson(conn.GetPath()))
 			if _, err := next.Server(ctx).Close(t.ctx, conn); err != nil {
 				logEntry.Errorf("failed to close timed out connection: %v %+v", conn.GetId(), err)
 			}
@@ -132,7 +119,6 @@ func (t *timeoutServer) createTimer(ctx context.Context, conn *networkservice.Co
 }
 
 func (t *timeoutServer) Close(ctx context.Context, conn *networkservice.Connection) (*empty.Empty, error) {
-	fmt.Printf("Timeut[%v] Close id=%v\n", time.Now(), conn.GetId())
 	logEntry := log.Entry(ctx).WithField("timeoutServer", "createTimer")
 
 	timer, ok := t.timers.LoadAndDelete(conn.GetId())

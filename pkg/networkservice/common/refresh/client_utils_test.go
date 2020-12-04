@@ -18,7 +18,6 @@ package refresh_test
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -32,10 +31,8 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 )
 
@@ -96,7 +93,6 @@ type refreshTesterServer struct {
 	mutex         sync.Mutex
 	state         int
 	lastSeen      time.Time
-	rateLimiter   *rate.Limiter
 	currentMarker string
 	nextMarker    string
 }
@@ -118,7 +114,6 @@ func newRefreshTesterServer(t *testing.T, minDuration, maxDuration time.Duration
 		minDuration: minDuration,
 		maxDuration: maxDuration,
 		state:       testRefreshStateInit,
-		rateLimiter: rate.NewLimiter(rate.Limit(1 / minDuration.Seconds()), 2),
 	}
 }
 
@@ -129,7 +124,6 @@ func (t *refreshTesterServer) beforeRequest(marker string) {
 	assert.Contains(t.t, []refreshTesterServerState{testRefreshStateInit, testRefreshStateRunning}, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitRequest
 	t.nextMarker = marker
-	if refresh.GetEnableTestLog() { fmt.Println("beforeRequest") }
 }
 
 func (t *refreshTesterServer) afterRequest() {
@@ -138,7 +132,6 @@ func (t *refreshTesterServer) afterRequest() {
 	t.checkUnlocked()
 	assert.Equal(t.t, testRefreshStateDoneRequest, t.state, "Unexpected state")
 	t.state = testRefreshStateRunning
-	if refresh.GetEnableTestLog() { fmt.Println("afterRequest") }
 }
 
 func (t *refreshTesterServer) beforeClose() {
@@ -147,7 +140,6 @@ func (t *refreshTesterServer) beforeClose() {
 	t.checkUnlocked()
 	assert.Equal(t.t, testRefreshStateRunning, t.state, "Unexpected state")
 	t.state = testRefreshStateWaitClose
-	if refresh.GetEnableTestLog() { fmt.Println("beforeClose") }
 }
 
 func (t *refreshTesterServer) afterClose() {
@@ -157,7 +149,6 @@ func (t *refreshTesterServer) afterClose() {
 	assert.Equal(t.t, testRefreshStateDoneClose, t.state, "Unexpected state")
 	t.state = testRefreshStateInit
 	t.currentMarker = ""
-	if refresh.GetEnableTestLog() { fmt.Println("afterClose") }
 }
 
 func (t *refreshTesterServer) checkUnlocked() {
@@ -169,7 +160,6 @@ func (t *refreshTesterServer) checkUnlocked() {
 
 func (t *refreshTesterServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
 	t.mutex.Lock()
-	if refresh.GetEnableTestLog() { fmt.Println("Request") }
 	locked := true
 	defer func() {
 		if locked {
@@ -187,28 +177,16 @@ func (t *refreshTesterServer) Request(ctx context.Context, request *networkservi
 		if marker == t.nextMarker {
 			t.state = testRefreshStateDoneRequest
 			t.currentMarker = t.nextMarker
-			t.rateLimiter = rate.NewLimiter(rate.Limit(1 / t.minDuration.Seconds()), 2)
 		}
 	case testRefreshStateDoneRequest, testRefreshStateRunning, testRefreshStateWaitClose:
 		assert.Equal(t.t, t.currentMarker, marker, "Unexpected marker")
-		// delta := time.Now().UTC().Sub(t.lastSeen)
-		// assert.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
+		delta := time.Now().UTC().Sub(t.lastSeen)
+		assert.Greaterf(t.t, int64(delta), int64(t.minDuration), "Too fast delta=%v min=%v", delta, t.minDuration)
 	default:
 		assert.Fail(t.t, "Unexpected state", t.state)
 	}
 
-	r := t.rateLimiter.Reserve()
-	delay := r.Delay()
-	if delay != 0 {
-		r.Cancel()
-		delta := time.Now().UTC().Sub(t.lastSeen)
-		assert.Failf(t.t, "Too fast", "delta=%v min=%v delay=%v", delta, t.minDuration, delay)
-		if delta < t.minDuration {
-			fmt.Printf("Warning: too fast; delta=%v min=%v delay=%v\n", delta, t.minDuration, delay)
-		}
-	}
 	t.lastSeen = time.Now()
-
 
 	t.mutex.Unlock()
 	locked = false
@@ -218,7 +196,6 @@ func (t *refreshTesterServer) Request(ctx context.Context, request *networkservi
 
 func (t *refreshTesterServer) Close(ctx context.Context, connection *networkservice.Connection) (*empty.Empty, error) {
 	t.mutex.Lock()
-	if refresh.GetEnableTestLog() { fmt.Println("Close") }
 	locked := true
 	defer func() {
 		if locked {
@@ -230,7 +207,6 @@ func (t *refreshTesterServer) Close(ctx context.Context, connection *networkserv
 
 	assert.Equal(t.t, testRefreshStateWaitClose, t.state, "Unexpected state")
 	t.state = testRefreshStateDoneClose
-	t.rateLimiter = nil
 
 	t.mutex.Unlock()
 	locked = false

@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Cisco Systems, Inc.
 // Copyright (c) 2020 Doc.ai and/or its affiliates.
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -20,10 +21,7 @@ package refresh
 
 import (
 	"context"
-	"fmt"
 	"sync"
-	"sync/atomic"
-	"encoding/json"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -50,40 +48,11 @@ func NewClient3(ctx context.Context) networkservice.NetworkServiceClient {
 	}
 }
 
-var enableTestLog int32
-func SetEnableTestLog(b bool) {
-	var bb int32
-	if b {
-		bb = 1
-	}
-	atomic.StoreInt32(&enableTestLog, bb)
-}
-func GetEnableTestLog() bool {
-	return atomic.LoadInt32(&enableTestLog) == 1
-}
-
-func ToJson(x interface{}) string {
-	b, err := json.Marshal(x)
-	if err != nil {
-		return err.Error()
-	}
-	return string(b)
-}
-
 func (t *refreshClient3) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
 	connectionID := request.Connection.Id
 	t.stopTimer(connectionID)
 
-	t0 := time.Now()
 	rv, err := next.Client(ctx).Request(ctx, request.Clone(), opts...)
-	path := rv.GetPath()
-	if GetEnableTestLog() {
-		if path == nil {
-			fmt.Printf("Refresh[%v]: done first, got err delta=%v\n", time.Now(), time.Now().Sub(t0))
-		} else {
-			fmt.Printf("Refresh[%v]: done first for name=%v id=%v delta=%v path=%s\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0), ToJson(path))
-		}
-	}
 
 	executor := serialize.GetExecutor(ctx)
 	if executor == nil {
@@ -97,20 +66,11 @@ func (t *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 }
 
 func (t *refreshClient3) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (e *empty.Empty, err error) {
-	if GetEnableTestLog() {
-		fmt.Printf("Refresh[%v]: close %v", time.Now(), conn.GetCurrentPathSegment().Id)
-		defer func() {
-			fmt.Printf("Refresh[%v]: close done %v", time.Now(), conn.GetCurrentPathSegment().Id)
-		}()
-	}
 	t.stopTimer(conn.Id)
 	return next.Client(ctx).Close(ctx, conn, opts...)
 }
 
 func (t *refreshClient3) stopTimer(connectionID string) {
-	if GetEnableTestLog() {
-		fmt.Printf("Refresh[%v]: cancel %v", time.Now(), connectionID)
-	}
 	value, loaded := t.timers.LoadAndDelete(connectionID)
 	if loaded {
 		value.(*time.Timer).Stop()
@@ -137,18 +97,9 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 		scale = 0.2 + 0.2*float64(path.Index)/float64(len(path.PathSegments))
 	}
 	duration := time.Duration(float64(time.Until(expireTime)) * scale)
-	if GetEnableTestLog() {
-		fmt.Printf("Refresh[%v]: init name=%v id=%v %v/%v scale=%v in=%v timeouts-in=%v at=%v\n",
-			time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, path.Index, len(path.PathSegments), scale, duration, time.Until(expireTime), time.Now().Add(duration))
-	}
 
 	var timer *time.Timer
-	timerStart := time.Now()
 	timer = time.AfterFunc(duration, func() {
-		elapsed := time.Now().Sub(timerStart)
-		if (elapsed - duration) > 10 * time.Millisecond || GetEnableTestLog() {
-			fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v duration(exp/act)=%v/%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, duration, elapsed)
-		}
 		exec.AsyncExec(func() {
 			oldTimer, _ := t.timers.LoadAndDelete(connectionID)
 			if oldTimer == nil {
@@ -164,15 +115,7 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 				return
 			}
 
-			if GetEnableTestLog() {
-				fmt.Printf("Refresh[%v]: running repeating for name=%v id=%v path=%s\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, ToJson(path))
-			}
-
-			t0 := time.Now()
 			rv, err := nextClient.Request(t.ctx, request.Clone(), opts...)
-			if GetEnableTestLog() {
-				fmt.Printf("Refresh[%v]: done repeating for name=%v id=%v delta=%v path=%s\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0), ToJson(path))
-			}
 
 			if err == nil && rv != nil {
 				request.Connection = rv

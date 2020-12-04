@@ -30,7 +30,6 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/goleak v1.1.10
 	golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980
-	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/grpc v1.33.2
 	google.golang.org/protobuf v1.25.0
