@@ -97,11 +97,20 @@ func (t *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 }
 
 func (t *refreshClient3) Close(ctx context.Context, conn *networkservice.Connection, opts ...grpc.CallOption) (e *empty.Empty, err error) {
+	if GetEnableTestLog() {
+		fmt.Printf("Refresh[%v]: close %v", time.Now(), conn.GetCurrentPathSegment().Id)
+		defer func() {
+			fmt.Printf("Refresh[%v]: close done %v", time.Now(), conn.GetCurrentPathSegment().Id)
+		}()
+	}
 	t.stopTimer(conn.Id)
 	return next.Client(ctx).Close(ctx, conn, opts...)
 }
 
 func (t *refreshClient3) stopTimer(connectionID string) {
+	if GetEnableTestLog() {
+		fmt.Printf("Refresh[%v]: cancel %v", time.Now(), connectionID)
+	}
 	value, loaded := t.timers.LoadAndDelete(connectionID)
 	if loaded {
 		value.(*time.Timer).Stop()

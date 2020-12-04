@@ -61,6 +61,7 @@ func NewServer(ctx context.Context) networkservice.NetworkServiceServer {
 
 func (t *timeoutServer) Request(ctx context.Context, request *networkservice.NetworkServiceRequest) (*networkservice.Connection, error) {
 	logEntry := log.Entry(ctx).WithField("timeoutServer", "request")
+	fmt.Printf("Timeut[%v] request id=%v\n", time.Now(), request.GetConnection().GetId())
 
 	connID := request.GetConnection().GetId()
 
@@ -120,9 +121,7 @@ func (t *timeoutServer) createTimer(ctx context.Context, conn *networkservice.Co
 				return
 			}
 			t.timers.Delete(conn.GetId())
-			fmt.Printf("Timed out! id=%v path=%v\n",
-				conn.GetId(), ToJson(conn.GetPath()),
-			)
+			fmt.Printf("Timed out! id=%v path=%v\n", conn.GetId(), ToJson(conn.GetPath()))
 			if _, err := next.Server(ctx).Close(t.ctx, conn); err != nil {
 				logEntry.Errorf("failed to close timed out connection: %v %+v", conn.GetId(), err)
 			}
@@ -133,6 +132,7 @@ func (t *timeoutServer) createTimer(ctx context.Context, conn *networkservice.Co
 }
 
 func (t *timeoutServer) Close(ctx context.Context, conn *networkservice.Connection) (*empty.Empty, error) {
+	fmt.Printf("Timeut[%v] Close id=%v\n", time.Now(), conn.GetId())
 	logEntry := log.Entry(ctx).WithField("timeoutServer", "createTimer")
 
 	timer, ok := t.timers.LoadAndDelete(conn.GetId())
