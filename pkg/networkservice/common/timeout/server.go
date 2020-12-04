@@ -22,6 +22,7 @@ package timeout
 import (
 	"context"
 	"fmt"
+	"encoding/json"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -34,6 +35,14 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/next"
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 )
+
+func ToJson(x interface{}) string {
+	b, err := json.Marshal(x)
+	if err != nil {
+		return err.Error()
+	}
+	return string(b)
+}
 
 type timeoutServer struct {
 	ctx    context.Context
@@ -111,7 +120,9 @@ func (t *timeoutServer) createTimer(ctx context.Context, conn *networkservice.Co
 				return
 			}
 			t.timers.Delete(conn.GetId())
-			fmt.Println("Timed out!")
+			fmt.Printf("Timed out! id=%v path=%v\n",
+				conn.GetId(), ToJson(conn.GetPath()),
+			)
 			if _, err := next.Server(ctx).Close(t.ctx, conn); err != nil {
 				logEntry.Errorf("failed to close timed out connection: %v %+v", conn.GetId(), err)
 			}

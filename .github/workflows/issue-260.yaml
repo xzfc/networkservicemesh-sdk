@@ -21,17 +21,14 @@ jobs:
       - name: Run tests[2]
         run: |
           eval $(go env)
-          mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
       - name: Run tests[3]
         run: |
           eval $(go env)
-          mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
       - name: Run tests[4]
         run: |
           eval $(go env)
-          mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
   test-win:
     # if: false
@@ -52,17 +49,14 @@ jobs:
       - name: Run tests[2]
         run: |
           $env:Path += ";$(go env GOPATH)\bin"
-          mkdir $home/junit
           gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
       - name: Run tests[3]
         run: |
           $env:Path += ";$(go env GOPATH)\bin"
-          mkdir $home/junit
           gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
       - name: Run tests[4]
         run: |
           $env:Path += ";$(go env GOPATH)\bin"
-          mkdir $home/junit
           gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
   test-osx:
     name: test-osx
@@ -82,15 +76,12 @@ jobs:
       - name: Run tests[2]
         run: |
           eval $(go env)
-          mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
       - name: Run tests[3]
         run: |
           eval $(go env)
-          mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7
       - name: Run tests[4]
         run: |
           eval $(go env)
-          mkdir -p ~/junit/
           ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=7

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"encoding/json"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -61,6 +62,14 @@ func GetEnableTestLog() bool {
 	return atomic.LoadInt32(&enableTestLog) == 1
 }
 
+func ToJson(x interface{}) string {
+	b, err := json.Marshal(x)
+	if err != nil {
+		return err.Error()
+	}
+	return string(b)
+}
+
 func (t *refreshClient3) Request(ctx context.Context, request *networkservice.NetworkServiceRequest, opts ...grpc.CallOption) (*networkservice.Connection, error) {
 	connectionID := request.Connection.Id
 	t.stopTimer(connectionID)
@@ -72,7 +81,7 @@ func (t *refreshClient3) Request(ctx context.Context, request *networkservice.Ne
 		if path == nil {
 			fmt.Printf("Refresh[%v]: done first, got err delta=%v\n", time.Now(), time.Now().Sub(t0))
 		} else {
-			fmt.Printf("Refresh[%v]: done first for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+			fmt.Printf("Refresh[%v]: done first for name=%v id=%v delta=%v path=%s\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0), ToJson(path))
 		}
 	}
 
@@ -146,13 +155,13 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 			}
 
 			if GetEnableTestLog() {
-				fmt.Printf("Refresh[%v]: running repeating for name=%v id=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id)
+				fmt.Printf("Refresh[%v]: running repeating for name=%v id=%v path=%s\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, ToJson(path))
 			}
 
 			t0 := time.Now()
 			rv, err := nextClient.Request(t.ctx, request.Clone(), opts...)
 			if GetEnableTestLog() {
-				fmt.Printf("Refresh[%v]: done repeating for name=%v id=%v delta=%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0))
+				fmt.Printf("Refresh[%v]: done repeating for name=%v id=%v delta=%v path=%s\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, time.Now().Sub(t0), ToJson(path))
 			}
 
 			if err == nil && rv != nil {
