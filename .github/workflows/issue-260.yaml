@@ -17,19 +17,19 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[2]
-        run: |
-          eval $(go env)
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[3]
-        run: |
-          eval $(go env)
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[4]
-        run: |
-          eval $(go env)
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=1 -run TestTimers
+      # - name: Run tests[2]
+      #   run: |
+      #     eval $(go env)
+      #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+      # - name: Run tests[3]
+      #   run: |
+      #     eval $(go env)
+      #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+      # - name: Run tests[4]
+      #   run: |
+      #     eval $(go env)
+      #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
   test-win:
     # if: false
     name: test-win
@@ -45,19 +45,19 @@ jobs:
         run: |
           $env:Path += ";$(go env GOPATH)\bin"
           mkdir $home/junit
-          gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[2]
-        run: |
-          $env:Path += ";$(go env GOPATH)\bin"
-          gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[3]
-        run: |
-          $env:Path += ";$(go env GOPATH)\bin"
-          gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[4]
-        run: |
-          $env:Path += ";$(go env GOPATH)\bin"
-          gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+          gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=1 -run TestTimers
+      # - name: Run tests[2]
+      #   run: |
+      #     $env:Path += ";$(go env GOPATH)\bin"
+      #     gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+      # - name: Run tests[3]
+      #   run: |
+      #     $env:Path += ";$(go env GOPATH)\bin"
+      #     gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+      # - name: Run tests[4]
+      #   run: |
+      #     $env:Path += ";$(go env GOPATH)\bin"
+      #     gotestsum -f standard-verbose --junitfile $home\junit\unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
   test-osx:
     name: test-osx
     runs-on: macos-latest
@@ -72,16 +72,16 @@ jobs:
         run: |
           eval $(go env)
           mkdir -p ~/junit/
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[2]
-        run: |
-          eval $(go env)
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[3]
-        run: |
-          eval $(go env)
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
-      - name: Run tests[4]
-        run: |
-          eval $(go env)
-          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+          ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=1 -run TestTimers
+       # - name: Run tests[2]
+       #   run: |
+       #     eval $(go env)
+       #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+       # - name: Run tests[3]
+       #   run: |
+       #     eval $(go env)
+       #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
+       # - name: Run tests[4]
+       #   run: |
+       #     eval $(go env)
+       #     ${GOPATH}/bin/gotestsum -f standard-verbose --junitfile ~/junit/unit-tests.xml -- -race github.com/networkservicemesh/sdk/pkg/networkservice/common/refresh -count=20 -run TestRefreshClient_Stress
