@@ -136,8 +136,9 @@ func (t *refreshClient3) startTimer(connectionID string, exec serialize.Executor
 	var timer *time.Timer
 	timerStart := time.Now()
 	timer = time.AfterFunc(duration, func() {
-		if GetEnableTestLog() {
-			fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v duration(exp/act)=%v/%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, duration, time.Now().Sub(timerStart))
+		elapsed := time.Now().Sub(timerStart)
+		if (elapsed - duration) > 10 * time.Millisecond || GetEnableTestLog() {
+			fmt.Printf("Refresh[%v]: afterfunc for name=%v id=%v duration(exp/act)=%v/%v\n", time.Now(), path.PathSegments[path.Index].Name, path.PathSegments[path.Index].Id, duration, elapsed)
 		}
 		exec.AsyncExec(func() {
 			oldTimer, _ := t.timers.LoadAndDelete(connectionID)
